@@ -1,82 +1,214 @@
-/* ============================================================
-   login.css — Role-based login page  (blue=patient, red=doctor)
-   ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@700&display=swap');
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-.login-page {
+/* ── Login Page ── */
+.auth-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0D2B5E 0%, #7A0C1E 100%);
-  font-family: 'DM Sans', sans-serif;
-  padding: 20px;
+  background: linear-gradient(145deg, #F0FDFA 0%, #ECFDF5 60%, #FFFFFF 100%);
+  padding: 2rem 1rem;
 }
 
-.login-card {
-  background: #fff;
+.auth-card {
+  background: #FFFFFF;
   border-radius: 20px;
-  padding: 36px 40px;
   width: 100%;
   max-width: 420px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  padding: 2rem;
+  box-shadow: 0 24px 60px rgba(13, 148, 136, 0.18);
+  animation: slideUp 0.25s ease;
 }
 
-/* Logo */
-.login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-.login-logo-icon {
-  width: 42px; height: 42px; border-radius: 10px;
-  background: linear-gradient(135deg, #1A4DA8, #C0182F);
-  display: flex; align-items: center; justify-content: center; font-size: 20px;
+.auth-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1.75rem;
 }
-.login-logo-name { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; color: #0D1B35; }
-.login-logo-sub  { font-size: 11px; color: #8899BB; }
 
-/* Title */
-.login-title { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: #0D1B35; }
-.login-sub   { font-size: 13px; color: #8899BB; margin-top: 4px; margin-bottom: 22px; }
-
-/* Role Selector */
-.role-selector { display: flex; gap: 8px; margin-bottom: 22px; }
-.role-btn {
-  flex: 1; padding: 10px 8px;
-  border: 1.5px solid #D4DEF0; border-radius: 10px;
-  background: #fff; font-size: 13px; font-weight: 500; color: #5A6A88;
-  cursor: pointer; transition: all .18s; font-family: 'DM Sans', sans-serif;
+.auth-card__logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #0D9488;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.role-btn:hover { border-color: #aaa; color: #333; }
-.role-active-patient { background: #E8F0FB; border-color: #1A4DA8 !important; color: #1A4DA8 !important; }
-.role-active-doctor  { background: #FDE8EB; border-color: #C0182F !important; color: #C0182F !important; }
+
+.auth-card__logo-text {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  color: #134E4A;
+  font-size: 18px;
+}
+
+.auth-card__title {
+  font-family: 'Fraunces', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #134E4A;
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.5px;
+}
+
+.auth-card__subtitle {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: #4B7B76;
+  margin: 0 0 1.5rem;
+}
+
+/* Role toggle */
+.role-toggle {
+  display: flex;
+  background: #F0FDFA;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 1.5rem;
+}
+
+.role-toggle__btn {
+  flex: 1;
+  border: none;
+  cursor: pointer;
+  padding: 8px 0;
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  background: transparent;
+  color: #4B7B76;
+  transition: all 0.2s ease;
+}
+
+.role-toggle__btn--active-patient {
+  background: #0D9488;
+  color: #FFFFFF;
+}
+
+.role-toggle__btn--active-doctor {
+  background: #6366F1;
+  color: #FFFFFF;
+}
 
 /* Form */
-.login-form { display: flex; flex-direction: column; gap: 16px; }
-.form-group { display: flex; flex-direction: column; gap: 5px; }
-.form-group label { font-size: 12px; font-weight: 600; color: #5A6A88; text-transform: uppercase; letter-spacing: .5px; }
-.form-group input {
-  padding: 10px 14px; border: 1.5px solid #D4DEF0; border-radius: 8px;
-  font-size: 14px; color: #0D1B35; font-family: 'DM Sans', sans-serif;
-  outline: none; transition: border-color .15s;
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.form-group input:focus { border-color: #1A4DA8; }
 
-/* Error */
-.login-error { font-size: 12px; color: #C0182F; background: #FDE8EB; padding: 8px 12px; border-radius: 6px; }
-
-/* Submit */
-.login-submit-btn {
-  padding: 12px; border: none; border-radius: 10px;
-  font-size: 14px; font-weight: 600; cursor: pointer;
-  font-family: 'DM Sans', sans-serif; color: #fff;
-  margin-top: 4px; transition: opacity .15s;
+.auth-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #B2DFDB;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  color: #134E4A;
+  transition: border-color 0.2s ease;
+  background: #FFFFFF;
 }
-.login-submit-btn:hover   { opacity: .88; }
-.login-submit-btn:disabled{ opacity: .6; cursor: not-allowed; }
-.btn-patient { background: linear-gradient(90deg, #1A4DA8, #3B7DD8); }
-.btn-doctor  { background: linear-gradient(90deg, #7A0C1E, #C0182F); }
 
-/* Toggle */
-.login-toggle { text-align: center; margin-top: 18px; font-size: 13px; color: #8899BB; }
-.login-toggle span { color: #1A4DA8; cursor: pointer; font-weight: 500; }
-.login-toggle span:hover { text-decoration: underline; }
+.auth-input:focus {
+  border-color: #0D9488;
+}
+
+.auth-input::placeholder {
+  color: #99D6CF;
+}
+
+.auth-submit-patient {
+  padding: 13px 0;
+  background: #0D9488;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.auth-submit-patient:hover {
+  background: #0F766E;
+  transform: translateY(-1px);
+}
+
+.auth-submit-doctor {
+  padding: 13px 0;
+  background: #6366F1;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.auth-submit-doctor:hover {
+  background: #4F46E5;
+  transform: translateY(-1px);
+}
+
+.auth-footer-text {
+  text-align: center;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #4B7B76;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.auth-footer-link {
+  color: #0D9488;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-footer-link:hover {
+  text-decoration: underline;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+}
+
+.auth-divider__line {
+  flex: 1;
+  height: 1px;
+  background: #B2DFDB;
+  opacity: 0.5;
+}
+
+.auth-divider__text {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: #99D6CF;
+}
+
+.auth-forgot {
+  text-align: right;
+  margin-top: -4px;
+}
+
+.auth-forgot a {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: #0D9488;
+  text-decoration: none;
+}
+
+.auth-forgot a:hover {
+  text-decoration: underline;
+}

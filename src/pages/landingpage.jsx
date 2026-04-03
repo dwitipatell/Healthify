@@ -3,6 +3,7 @@ import Navbar from "./navbar";
 import "../styles/Global.css";
 import "../styles/landingPage.css";
 
+
 /* ── Hero Section ── */
 function HeroSection({ onCTA }) {
   const stats = [
