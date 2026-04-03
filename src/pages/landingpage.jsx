@@ -1,8 +1,47 @@
 import { useState } from "react";
 import Navbar from "./navbar";
-import "../styles/Global.css";
+import "../styles/global.css";
 import "../styles/landingPage.css";
 
+/* ── Get Started Modal ── */
+function GetStartedModal({ onClose, onLogin }) {
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <button className="modal-back" onClick={onClose}>← Back</button>
+        <div className="modal-title">Get started</div>
+        <div className="modal-sub">Create your free patient account</div>
+        <div className="modal-form-row">
+          <div className="modal-form-group">
+            <label className="modal-label">First name</label>
+            <input className="modal-input" placeholder="Daksh" />
+          </div>
+          <div className="modal-form-group">
+            <label className="modal-label">Last name</label>
+            <input className="modal-input" placeholder="Patel" />
+          </div>
+        </div>
+        <div className="modal-form-group">
+          <label className="modal-label">Email address</label>
+          <input className="modal-input" type="email" placeholder="you@email.com" />
+        </div>
+        <div className="modal-form-group">
+          <label className="modal-label">Phone number</label>
+          <input className="modal-input" type="tel" placeholder="+91 99999 00000" />
+        </div>
+        <div className="modal-form-group">
+          <label className="modal-label">Password</label>
+          <input className="modal-input" type="password" placeholder="••••••••" />
+        </div>
+        <button className="modal-submit">Create account</button>
+        <div className="modal-signin">
+          Already have an account?{" "}
+          <span onClick={onLogin}>Sign in</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ── Hero Section ── */
 function HeroSection({ onCTA }) {
@@ -42,10 +81,7 @@ function HeroSection({ onCTA }) {
           </p>
 
           <div className="hero__cta-group">
-            <button
-              onClick={onCTA}
-              className="hero__cta-primary"
-            >
+            <button onClick={onCTA} className="hero__cta-primary">
               Book an Appointment →
             </button>
             <button onClick={onCTA} className="hero__cta-secondary">
@@ -223,13 +259,22 @@ function Footer({ onLogin }) {
 
 /* ── Page Entry ── */
 export default function LandingPage({ onLogin, onSignup }) {
+  const [showModal, setShowModal] = useState(false);
+
+  const handleCTA = () => setShowModal(true);
+  const handleClose = () => setShowModal(false);
+
   return (
     <div>
-      <Navbar onLogin={onLogin} onSignup={onSignup} />
-      <HeroSection onCTA={onSignup} />
+      <Navbar onLogin={onLogin} onSignup={handleCTA} />
+      <HeroSection onCTA={handleCTA} />
       <FeaturesSection />
-      <HowItWorks onCTA={onSignup} />
+      <HowItWorks onCTA={handleCTA} />
       <Footer onLogin={onLogin} />
+
+      {showModal && (
+        <GetStartedModal onClose={handleClose} onLogin={onLogin} />
+      )}
     </div>
   );
 }
