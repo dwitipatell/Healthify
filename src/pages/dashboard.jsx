@@ -3,7 +3,6 @@ import "../styles/dashboard.css";
 import AppointmentCalendar from "../components/AppointmentCalendar";
 
 
-
 export default function Dashboard() {
   return (
     <div className="dashboard">
