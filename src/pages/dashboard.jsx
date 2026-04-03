@@ -1,10 +1,13 @@
 import React from "react";
 import "../styles/dashboard.css";
 import AppointmentCalendar from "../components/AppointmentCalendar";
+import Navbar from "./navbar";
 
 
 export default function Dashboard() {
   return (
+    <>
+     <Navbar/>
     <div className="dashboard">
 
       {/* TOP STATS */}
@@ -89,5 +92,6 @@ export default function Dashboard() {
       </div>
 
     </div>
+    </>
   );
 }
