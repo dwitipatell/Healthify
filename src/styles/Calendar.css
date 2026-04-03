@@ -1,0 +1,37 @@
+.calendar-container {
+  background: rgb(235, 128, 128);
+  padding: 20px;
+  border-radius: 12px;
+  margin-top: 20px;
+}
+
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.slot {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #e5e7eb;
+  cursor: pointer;
+}
+
+.slot.active {
+  background: #2563eb;
+  color: white;
+}
+
+.book-btn {
+  margin-top: 15px;
+  width: 100%;
+  padding: 10px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}

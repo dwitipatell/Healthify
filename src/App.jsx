@@ -5,14 +5,15 @@ import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 import Navbar from './pages/navbar';
-import Login from './pages/login';
+import Dashboard from './pages/dashboard';
 
 function App() {
 
   return (
-    <Routes>
-      <Route path="/" element={<Login />} />
-    </Routes>
+    <>
+      <Navbar />
+      <Dashboard />
+    </>
   )
 }
 
