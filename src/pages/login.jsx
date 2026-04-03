@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';  
 import '../styles/login.css';
-import "../components/Global.css";
 
-const Login = ({ onBack }) => {
+const Login = () => {
+  const navigate = useNavigate();
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [role, setRole] = useState('patient');
   const [email, setEmail] = useState('');
@@ -13,6 +14,8 @@ const Login = ({ onBack }) => {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleBackToHome = () => navigate("/");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -48,12 +51,17 @@ const Login = ({ onBack }) => {
 
   return (
     <div className="auth-page">
-      {/* Light subtle dashboard preview background */}
-      <div className="auth-page-bg-preview"></div>
+      {/* Blurred Dashboard Background */}
+      <div className="auth-bg">
+        <div className="auth-bg-dashboard" />
+      </div>
 
       <div className="auth-card">
-        {/* Back Button - Fixed & Prominent */}
-        <button className="login-back-btn" onClick={onBack || (() => window.location.href = '/')}>
+        {/* Back Button */}
+        <button 
+          className="login-back-btn" 
+          onClick={handleBackToHome}
+        >
           ← Back to Home
         </button>
 

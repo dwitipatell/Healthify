@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "../styles/global.css";
-import "../styles/login.css";   // shared auth styles
-import "../styles/signup.css";  // signup-specific additions
+import "../styles/login.css";
+import "../styles/signup.css";
 
 const BENEFITS = [
   "Book appointments in under 60 seconds",
@@ -9,7 +10,9 @@ const BENEFITS = [
   "Access your full medical history anytime",
 ];
 
-export default function SignupPage({ onSwitchToLogin, onBack }) {
+export default function SignupPage() {
+  const navigate = useNavigate();
+
   const [role, setRole] = useState("patient");
   const [fullName, setFullName] = useState("");
   const [license, setLicense] = useState("");
@@ -18,12 +21,23 @@ export default function SignupPage({ onSwitchToLogin, onBack }) {
 
   const isDoctor = role === "doctor";
 
+  const handleBackToHome = () => navigate("/");
+  const handleGoToLogin = () => navigate("/login");
+
   return (
     <div className="auth-page">
+      {/* Blurred Dashboard Background */}
+      <div className="auth-bg">
+        <div className="auth-bg-dashboard" />
+      </div>
+
       <div className="auth-card">
 
-        {/* Back Button - Consistent with Login page */}
-        <button className="login-back-btn" onClick={onBack}>
+        {/* Back Button */}
+        <button 
+          className="login-back-btn" 
+          onClick={handleBackToHome}
+        >
           ← Back to Home
         </button>
 
@@ -57,7 +71,10 @@ export default function SignupPage({ onSwitchToLogin, onBack }) {
 
         {/* Role Toggle */}
         <div className="role-toggle">
-          {[["patient", "Patient"], ["doctor", "Doctor / Staff"]].map(([val, label]) => (
+          {[
+            ["patient", "Patient"],
+            ["doctor", "Doctor / Staff"]
+          ].map(([val, label]) => (
             <button
               key={val}
               onClick={() => setRole(val)}
@@ -116,7 +133,7 @@ export default function SignupPage({ onSwitchToLogin, onBack }) {
 
           <button 
             className={isDoctor ? "auth-submit-doctor" : "auth-submit-patient"}
-            type="button"   // Change to "submit" when you connect to Supabase
+            type="button"
           >
             Create Account →
           </button>
@@ -129,7 +146,7 @@ export default function SignupPage({ onSwitchToLogin, onBack }) {
 
         <p className="auth-footer-text">
           Already have an account?{" "}
-          <span className="auth-footer-link" onClick={onSwitchToLogin}>
+          <span className="auth-footer-link" onClick={handleGoToLogin}>
             Sign in
           </span>
         </p>

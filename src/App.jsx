@@ -14,10 +14,10 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/doctordashboard" element={<DoctorDashboard />} />
+        <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
         <Route path="/patientdashboard" element={<PatientDashboard />} />
-
-
-        {/* Optional: redirect unknown routes */}
+        <Route path="/patient-dashboard" element={<PatientDashboard />} />
+        {/* Redirect unknown routes */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

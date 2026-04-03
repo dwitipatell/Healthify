@@ -1,5 +1,8 @@
-import { useState } from "react";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
 
+// ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
   // — Sidebar (dark indigo)
   sidebarBg: "#12103A",
@@ -14,7 +17,7 @@ const C = {
   primaryLight: "#C7D2FE",
   primaryXLight: "#EEF2FF",
   primaryGlow: "rgba(99,102,241,0.2)",
-  // — Teal accent (from landing page teal palette — keeps vibe consistent)
+  // — Teal accent
   teal: "#0D9488",
   tealLight: "#CCFBF1",
   tealXLight: "#F0FDFA",
@@ -40,63 +43,99 @@ const C = {
 const FONT_SANS = "'DM Sans', sans-serif";
 const FONT_SERIF = "'Fraunces', serif";
 
+// ─── Nav Items ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "dashboard",   label: "Dashboard",       icon: DashIcon },
-  { id: "schedule",    label: "My Schedule",      icon: CalIcon },
-  { id: "queue",       label: "Patient Queue",    icon: QueueIcon, badge: 5 },
-  { id: "appointments",label: "Appointments",     icon: ListIcon },
-  { id: "records",     label: "Patient Records",  icon: FolderIcon },
+  { id: "dashboard",    label: "Dashboard",      icon: DashIcon },
+  { id: "schedule",     label: "My Schedule",    icon: CalIcon },
+  { id: "queue",        label: "Patient Queue",  icon: QueueIcon, badge: 5 },
+  { id: "appointments", label: "Appointments",   icon: ListIcon },
+  { id: "records",      label: "Patient Records",icon: FolderIcon },
   { id: "prescriptions",label: "Prescriptions",  icon: PillIcon },
-  { id: "analytics",   label: "Analytics",        icon: ChartIcon },
-  { id: "settings",    label: "Settings",         icon: GearIcon },
+  { id: "analytics",   label: "Analytics",       icon: ChartIcon },
+  { id: "settings",    label: "Settings",        icon: GearIcon },
 ];
 
-// — Icons
-function DashIcon({ size=16, color="currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="8" height="8" rx="2" fill={color}/><rect x="13" y="3" width="8" height="8" rx="2" fill={color} opacity=".5"/><rect x="3" y="13" width="8" height="8" rx="2" fill={color} opacity=".5"/><rect x="13" y="13" width="8" height="8" rx="2" fill={color} opacity=".3"/></svg>;
+// ─── Icons ────────────────────────────────────────────────────────────────────
+function DashIcon({ size = 16, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="8" height="8" rx="2" fill={color} />
+      <rect x="13" y="3" width="8" height="8" rx="2" fill={color} opacity=".5" />
+      <rect x="3" y="13" width="8" height="8" rx="2" fill={color} opacity=".5" />
+      <rect x="13" y="13" width="8" height="8" rx="2" fill={color} opacity=".3" />
+    </svg>
+  );
 }
-function CalIcon({ size=16, color="currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke={color} strokeWidth="1.8"/><path d="M3 10h18M8 3v4M16 3v4" stroke={color} strokeWidth="1.8" strokeLinecap="round"/></svg>;
+function CalIcon({ size = 16, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="5" width="18" height="16" rx="3" stroke={color} strokeWidth="1.8" />
+      <path d="M3 10h18M8 3v4M16 3v4" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
 }
-function QueueIcon({ size=16, color="currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><circle cx="9" cy="7" r="3" stroke={color} strokeWidth="1.8"/><path d="M3 20v-1a6 6 0 0112 0v1" stroke={color} strokeWidth="1.8" strokeLinecap="round"/><path d="M16 3l4 4-4 4M20 7H13" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+function QueueIcon({ size = 16, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="9" cy="7" r="3" stroke={color} strokeWidth="1.8" />
+      <path d="M3 20v-1a6 6 0 0112 0v1" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M16 3l4 4-4 4M20 7H13" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
-function ListIcon({ size=16, color="currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke={color} strokeWidth="2" strokeLinecap="round"/></svg>;
+function ListIcon({ size = 16, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
 }
-function FolderIcon({ size=16, color="currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M3 8a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" stroke={color} strokeWidth="1.8"/></svg>;
+function FolderIcon({ size = 16, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M3 8a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" stroke={color} strokeWidth="1.8" />
+    </svg>
+  );
 }
-function PillIcon({ size=16, color="currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M10.5 3.5a5 5 0 010 7.07L7.07 14l-4.24-4.24a5 5 0 010-7.07 5 5 0 017.07 0zM13.5 10.5l4.24 4.24a5 5 0 01-7.07 7.07" stroke={color} strokeWidth="1.8" strokeLinecap="round"/></svg>;
+function PillIcon({ size = 16, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M10.5 3.5a5 5 0 010 7.07L7.07 14l-4.24-4.24a5 5 0 010-7.07 5 5 0 017.07 0zM13.5 10.5l4.24 4.24a5 5 0 01-7.07 7.07" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
 }
-function ChartIcon({ size=16, color="currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M4 20h16M4 20V10l5-5 4 4 5-5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+function ChartIcon({ size = 16, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 20h16M4 20V10l5-5 4 4 5-5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
-function GearIcon({ size=16, color="currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke={color} strokeWidth="1.8"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke={color} strokeWidth="1.8"/></svg>;
-}
-function StethIcon({ size=20, color="currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M4.5 6.5a3 3 0 003 3v4a4.5 4.5 0 009 0v-1a2 2 0 10-1.5 0v1a3 3 0 01-6 0v-4a3 3 0 003-3V3.5h-1.5v1h-3v-1H4.5v3z" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
-}
-function CheckIcon({ size=14, color="#10B981" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+function GearIcon({ size = 16, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="3" stroke={color} strokeWidth="1.8" />
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke={color} strokeWidth="1.8" />
+    </svg>
+  );
 }
 
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
-function Sidebar({ active, setActive }) {
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+function Sidebar({ active, setActive, user, onSignOut }) {
   return (
     <aside style={{ width: 240, minWidth: 240, background: C.sidebarBg, display: "flex", flexDirection: "column", borderRight: `1px solid ${C.sidebarBorder}`, height: "100vh", position: "sticky", top: 0 }}>
       <div style={{ padding: "24px 20px 20px", borderBottom: `1px solid ${C.sidebarBorder}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: C.primary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="3" width="18" height="18" rx="4" fill="white" opacity=".2"/>
-              <path d="M12 8v8M8 12h8" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+              <rect x="3" y="3" width="18" height="18" rx="4" fill="white" opacity=".2" />
+              <path d="M12 8v8M8 12h8" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           </div>
           <div>
-            <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 17, color: C.white, margin: 0, letterSpacing: "-0.3px" }}>Health<span style={{ color: C.primaryLight }}>ify</span></p>
+            <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 17, color: C.white, margin: 0, letterSpacing: "-0.3px" }}>
+              Health<span style={{ color: C.primaryLight }}>ify</span>
+            </p>
             <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.sidebarText, margin: 0 }}>Doctor Portal</p>
           </div>
         </div>
@@ -107,12 +146,19 @@ function Sidebar({ active, setActive }) {
           const Icon = item.icon;
           const isActive = active === item.id;
           return (
-            <button key={item.id} onClick={() => setActive(item.id)}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: "none", background: isActive ? C.sidebarActive : "transparent", borderLeft: isActive ? `3px solid ${C.sidebarActiveBorder}` : "3px solid transparent", cursor: "pointer", transition: "all 0.15s" }}>
+            <button
+              key={item.id}
+              onClick={() => setActive(item.id)}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: "none", background: isActive ? C.sidebarActive : "transparent", borderLeft: isActive ? `3px solid ${C.sidebarActiveBorder}` : "3px solid transparent", cursor: "pointer", transition: "all 0.15s" }}
+            >
               <Icon size={16} color={isActive ? C.primaryLight : C.sidebarText} />
-              <span style={{ fontFamily: FONT_SANS, fontSize: 14, fontWeight: isActive ? 600 : 400, color: isActive ? C.sidebarActiveText : C.sidebarText, flex: 1, textAlign: "left" }}>{item.label}</span>
+              <span style={{ fontFamily: FONT_SANS, fontSize: 14, fontWeight: isActive ? 600 : 400, color: isActive ? C.sidebarActiveText : C.sidebarText, flex: 1, textAlign: "left" }}>
+                {item.label}
+              </span>
               {item.badge && (
-                <span style={{ background: C.rose, color: C.white, fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 100, fontFamily: FONT_SANS }}>{item.badge}</span>
+                <span style={{ background: C.rose, color: C.white, fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 100, fontFamily: FONT_SANS }}>
+                  {item.badge}
+                </span>
               )}
             </button>
           );
@@ -121,13 +167,22 @@ function Sidebar({ active, setActive }) {
 
       <div style={{ padding: "16px", borderTop: `1px solid ${C.sidebarBorder}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: "50%", background: C.primary, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_SANS, fontWeight: 700, fontSize: 14, color: C.white, flexShrink: 0 }}>PM</div>
+          <div style={{ width: 38, height: 38, borderRadius: "50%", background: C.primary, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_SANS, fontWeight: 700, fontSize: 14, color: C.white, flexShrink: 0 }}>
+            {user?.user_metadata?.full_name?.slice(0, 2).toUpperCase() || 'DR'}
+          </div>
           <div style={{ overflow: "hidden" }}>
-            <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 13, color: C.white, margin: 0 }}>Dr. Priya Mehta</p>
+            <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 13, color: C.white, margin: 0 }}>
+              {user?.user_metadata?.full_name || 'Dr. Mehta'}
+            </p>
             <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.sidebarText, margin: 0 }}>Cardiologist</p>
           </div>
         </div>
-        <button style={{ width: "100%", padding: "8px 0", borderRadius: 8, border: `1px solid ${C.sidebarBorder}`, background: "transparent", fontFamily: FONT_SANS, fontSize: 13, fontWeight: 500, color: C.sidebarText, cursor: "pointer" }}>Sign out</button>
+        <button
+          onClick={onSignOut}
+          style={{ width: "100%", padding: "8px 0", borderRadius: 8, border: `1px solid ${C.sidebarBorder}`, background: "transparent", fontFamily: FONT_SANS, fontSize: 13, fontWeight: 500, color: C.sidebarText, cursor: "pointer" }}
+        >
+          Sign out
+        </button>
       </div>
     </aside>
   );
@@ -136,14 +191,22 @@ function Sidebar({ active, setActive }) {
 // ─── Stat Cards ───────────────────────────────────────────────────────────────
 function StatCards() {
   const stats = [
-    { label: "Today's Patients", value: "12", sub: "3 remaining", subColor: C.primary, subBg: C.primaryXLight, iconBg: C.primary,
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="7" r="4" stroke="rgba(199,210,254,0.9)" strokeWidth="1.8"/><path d="M3 21v-2a7 7 0 0114 0v2" stroke="rgba(199,210,254,0.9)" strokeWidth="1.8" strokeLinecap="round"/></svg> },
-    { label: "Completed Today", value: "9", sub: "On schedule", subColor: C.emerald, subBg: "#D1FAE5", iconBg: C.emerald,
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4" stroke="rgba(209,250,229,0.9)" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="12" r="9" stroke="rgba(209,250,229,0.9)" strokeWidth="1.8"/></svg> },
-    { label: "Pending Notes", value: "4", sub: "Write now", subColor: C.amber, subBg: C.amberLight, iconBg: C.amber,
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="rgba(254,243,199,0.9)" strokeWidth="1.8" strokeLinecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="rgba(254,243,199,0.9)" strokeWidth="1.8" strokeLinecap="round"/></svg> },
-    { label: "Free Slots Today", value: "2", sub: "Out of 14", subColor: C.teal, subBg: C.tealXLight, iconBg: C.teal,
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke="rgba(204,251,241,0.9)" strokeWidth="1.5"/><path d="M3 10h18M8 3v4M16 3v4" stroke="rgba(204,251,241,0.9)" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+    {
+      label: "Today's Patients", value: "12", sub: "3 remaining", subColor: C.primary, subBg: C.primaryXLight, iconBg: C.primary,
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="7" r="4" stroke="rgba(199,210,254,0.9)" strokeWidth="1.8" /><path d="M3 21v-2a7 7 0 0114 0v2" stroke="rgba(199,210,254,0.9)" strokeWidth="1.8" strokeLinecap="round" /></svg>,
+    },
+    {
+      label: "Completed Today", value: "9", sub: "On schedule", subColor: C.emerald, subBg: "#D1FAE5", iconBg: C.emerald,
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4" stroke="rgba(209,250,229,0.9)" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="12" r="9" stroke="rgba(209,250,229,0.9)" strokeWidth="1.8" /></svg>,
+    },
+    {
+      label: "Pending Notes", value: "4", sub: "Write now", subColor: C.amber, subBg: C.amberLight, iconBg: C.amber,
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="rgba(254,243,199,0.9)" strokeWidth="1.8" strokeLinecap="round" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="rgba(254,243,199,0.9)" strokeWidth="1.8" strokeLinecap="round" /></svg>,
+    },
+    {
+      label: "Free Slots Today", value: "2", sub: "Out of 14", subColor: C.teal, subBg: C.tealXLight, iconBg: C.teal,
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke="rgba(204,251,241,0.9)" strokeWidth="1.5" /><path d="M3 10h18M8 3v4M16 3v4" stroke="rgba(204,251,241,0.9)" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+    },
   ];
 
   return (
@@ -161,21 +224,21 @@ function StatCards() {
   );
 }
 
-// ─── Today's Schedule Timeline ────────────────────────────────────────────────
+// ─── Today's Schedule ─────────────────────────────────────────────────────────
 function TodaySchedule() {
   const schedule = [
-    { time: "9:00 AM", name: "Arjun Sharma", age: 34, reason: "Follow-up ECG", status: "done", statusLabel: "Done" },
-    { time: "9:30 AM", name: "Kavya Nair", age: 28, reason: "First visit – chest pain", status: "done", statusLabel: "Done" },
-    { time: "10:00 AM", name: "Ravi Pillai", age: 52, reason: "BP monitoring review", status: "done", statusLabel: "Done" },
-    { time: "2:30 PM", name: "Sneha Joshi", age: 41, reason: "Cardiology consultation", status: "current", statusLabel: "In progress" },
-    { time: "3:15 PM", name: "Mohan Das", age: 60, reason: "Post-surgery check-in", status: "waiting", statusLabel: "Waiting" },
-    { time: "4:00 PM", name: "Preethi Iyer", age: 37, reason: "Palpitations workup", status: "upcoming", statusLabel: "Upcoming" },
+    { time: "9:00 AM",  name: "Arjun Sharma", age: 34, reason: "Follow-up ECG",             status: "done",     statusLabel: "Done" },
+    { time: "9:30 AM",  name: "Kavya Nair",   age: 28, reason: "First visit – chest pain",  status: "done",     statusLabel: "Done" },
+    { time: "10:00 AM", name: "Ravi Pillai",  age: 52, reason: "BP monitoring review",      status: "done",     statusLabel: "Done" },
+    { time: "2:30 PM",  name: "Sneha Joshi",  age: 41, reason: "Cardiology consultation",   status: "current",  statusLabel: "In progress" },
+    { time: "3:15 PM",  name: "Mohan Das",    age: 60, reason: "Post-surgery check-in",     status: "waiting",  statusLabel: "Waiting" },
+    { time: "4:00 PM",  name: "Preethi Iyer", age: 37, reason: "Palpitations workup",       status: "upcoming", statusLabel: "Upcoming" },
   ];
 
   const statusStyles = {
     done:     { color: C.emerald, bg: C.emeraldLight },
     current:  { color: C.primary, bg: C.primaryXLight },
-    waiting:  { color: C.amber, bg: C.amberLight },
+    waiting:  { color: C.amber,   bg: C.amberLight },
     upcoming: { color: C.textMuted, bg: C.borderMuted },
   };
 
@@ -193,7 +256,9 @@ function TodaySchedule() {
             <p style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 600, color: isCurrent ? C.primary : C.textMuted, minWidth: 58, margin: 0 }}>{s.time}</p>
             <div style={{ width: 10, height: 10, borderRadius: "50%", background: ss.color, flexShrink: 0, boxShadow: isCurrent ? `0 0 0 3px ${C.primaryXLight}, 0 0 0 5px ${C.primary}40` : "none" }} />
             <div style={{ flex: 1 }}>
-              <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 14, color: C.text, margin: 0 }}>{s.name} <span style={{ fontWeight: 400, color: C.textMuted, fontSize: 13 }}>· {s.age}y</span></p>
+              <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 14, color: C.text, margin: 0 }}>
+                {s.name} <span style={{ fontWeight: 400, color: C.textMuted, fontSize: 13 }}>· {s.age}y</span>
+              </p>
               <p style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{s.reason}</p>
             </div>
             <span style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 600, color: ss.color, background: ss.bg, padding: "3px 12px", borderRadius: 100 }}>{s.statusLabel}</span>
@@ -210,11 +275,11 @@ function TodaySchedule() {
 // ─── Patient Queue ────────────────────────────────────────────────────────────
 function PatientQueue() {
   const queue = [
-    { pos: 1, name: "Sneha Joshi", wait: "Now", urgent: false, tag: "Cardiology" },
-    { pos: 2, name: "Mohan Das", wait: "~10 min", urgent: false, tag: "Post-op" },
-    { pos: 3, name: "Preethi Iyer", wait: "~25 min", urgent: true, tag: "Urgent" },
-    { pos: 4, name: "Walk-in patient", wait: "~40 min", urgent: false, tag: "General" },
-    { pos: 5, name: "Rithvik Menon", wait: "~55 min", urgent: false, tag: "Follow-up" },
+    { pos: 1, name: "Sneha Joshi",    wait: "Now",    urgent: false, tag: "Cardiology" },
+    { pos: 2, name: "Mohan Das",      wait: "~10 min",urgent: false, tag: "Post-op" },
+    { pos: 3, name: "Preethi Iyer",   wait: "~25 min",urgent: true,  tag: "Urgent" },
+    { pos: 4, name: "Walk-in patient",wait: "~40 min",urgent: false, tag: "General" },
+    { pos: 5, name: "Rithvik Menon",  wait: "~55 min",urgent: false, tag: "Follow-up" },
   ];
 
   return (
@@ -243,17 +308,19 @@ function PatientQueue() {
 // ─── Quick Actions ────────────────────────────────────────────────────────────
 function QuickActions() {
   const actions = [
-    { label: "Write Prescription", color: C.primary, bg: C.primaryXLight },
-    { label: "Add Lab Order", color: C.teal, bg: C.tealXLight },
-    { label: "Schedule Follow-up", color: C.amber, bg: C.amberLight },
-    { label: "View Lab Results", color: C.emerald, bg: C.emeraldLight },
+    { label: "Write Prescription",  color: C.primary, bg: C.primaryXLight },
+    { label: "Add Lab Order",       color: C.teal,    bg: C.tealXLight },
+    { label: "Schedule Follow-up",  color: C.amber,   bg: C.amberLight },
+    { label: "View Lab Results",    color: C.emerald, bg: C.emeraldLight },
   ];
   return (
     <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, padding: "18px 20px" }}>
       <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 15, color: C.text, margin: "0 0 14px" }}>Quick Actions</p>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {actions.map((a, i) => (
-          <button key={i} style={{ padding: "11px 14px", borderRadius: 10, border: `1px solid ${a.color}30`, background: a.bg, color: a.color, fontFamily: FONT_SANS, fontWeight: 600, fontSize: 13, cursor: "pointer", textAlign: "left" }}>{a.label}</button>
+          <button key={i} style={{ padding: "11px 14px", borderRadius: 10, border: `1px solid ${a.color}30`, background: a.bg, color: a.color, fontFamily: FONT_SANS, fontWeight: 600, fontSize: 13, cursor: "pointer", textAlign: "left" }}>
+            {a.label}
+          </button>
         ))}
       </div>
     </div>
@@ -283,8 +350,8 @@ function AnalyticsMini() {
   );
 }
 
-// ─── Dashboard Main ───────────────────────────────────────────────────────────
-function DashboardContent() {
+// ─── Dashboard Content ────────────────────────────────────────────────────────
+function DashboardContent({ setActive }) {
   const now = new Date();
   const hour = now.getHours();
   const greet = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
@@ -305,10 +372,11 @@ function DashboardContent() {
           + New Patient
         </button>
       </div>
+
       <StatCards />
 
       {/* Highlight card — Current Patient */}
-      <div style={{ margin: "20px 32px 0", borderRadius: 20, padding: "26px 32px", background: `linear-gradient(130deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%)`, position: "relative", overflow: "hidden" }}>
+      <div style={{ margin: "20px 32px 0", borderRadius: 20, padding: "26px 32px", background: "linear-gradient(130deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%)", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: -50, right: -50, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
         <div style={{ position: "absolute", bottom: -30, right: 100, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.03)" }} />
         <p style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "1.5px", textTransform: "uppercase", margin: "0 0 10px" }}>Current Patient</p>
@@ -365,11 +433,11 @@ function SchedulePage() {
 // ─── Patient Records Page ─────────────────────────────────────────────────────
 function PatientRecordsPage() {
   const patients = [
-    { name: "Arjun Sharma", age: 34, condition: "Hypertension", lastVisit: "Today", avatar: "AS" },
-    { name: "Kavya Nair", age: 28, condition: "Chest pain workup", lastVisit: "Today", avatar: "KN" },
-    { name: "Ravi Pillai", age: 52, condition: "Type 2 Diabetes + HTN", lastVisit: "Today", avatar: "RP" },
-    { name: "Sneha Joshi", age: 41, condition: "Palpitations", lastVisit: "Today", avatar: "SJ" },
-    { name: "Preethi Iyer", age: 37, condition: "Post-MI follow-up", lastVisit: "Mar 20", avatar: "PI" },
+    { name: "Arjun Sharma", age: 34, condition: "Hypertension",         lastVisit: "Today",  avatar: "AS" },
+    { name: "Kavya Nair",   age: 28, condition: "Chest pain workup",    lastVisit: "Today",  avatar: "KN" },
+    { name: "Ravi Pillai",  age: 52, condition: "Type 2 Diabetes + HTN",lastVisit: "Today",  avatar: "RP" },
+    { name: "Sneha Joshi",  age: 41, condition: "Palpitations",         lastVisit: "Today",  avatar: "SJ" },
+    { name: "Preethi Iyer", age: 37, condition: "Post-MI follow-up",    lastVisit: "Mar 20", avatar: "PI" },
   ];
   return (
     <div>
@@ -383,7 +451,9 @@ function PatientRecordsPage() {
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 20px", borderBottom: i < patients.length - 1 ? `1px solid ${C.borderMuted}` : "none" }}>
               <div style={{ width: 42, height: 42, borderRadius: "50%", background: C.primaryXLight, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_SANS, fontWeight: 700, fontSize: 13, color: C.primary, flexShrink: 0 }}>{p.avatar}</div>
               <div style={{ flex: 1 }}>
-                <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 14, color: C.text, margin: 0 }}>{p.name} <span style={{ fontWeight: 400, color: C.textMuted }}>· {p.age}y</span></p>
+                <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 14, color: C.text, margin: 0 }}>
+                  {p.name} <span style={{ fontWeight: 400, color: C.textMuted }}>· {p.age}y</span>
+                </p>
                 <p style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{p.condition} · Last visit: {p.lastVisit}</p>
               </div>
               <button style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", fontFamily: FONT_SANS, fontSize: 12, color: C.primary, cursor: "pointer", fontWeight: 500 }}>View Record</button>
@@ -420,7 +490,12 @@ function AnalyticsPage() {
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {[["Avg. patients/day", "11.8", C.primary], ["Avg. consult time", "22 min", C.teal], ["No-show rate", "4.2%", C.amber], ["Patient satisfaction", "4.8 / 5", C.emerald]].map(([label, val, color], i) => (
+          {[
+            ["Avg. patients/day", "11.8", C.primary],
+            ["Avg. consult time",  "22 min", C.teal],
+            ["No-show rate",       "4.2%",   C.amber],
+            ["Patient satisfaction","4.8 / 5",C.emerald],
+          ].map(([label, val, color], i) => (
             <div key={i} style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "14px 16px" }}>
               <p style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, margin: "0 0 4px" }}>{label}</p>
               <p style={{ fontFamily: FONT_SERIF, fontSize: 24, fontWeight: 700, color, margin: 0 }}>{val}</p>
@@ -445,7 +520,7 @@ function QueuePage() {
   );
 }
 
-// ─── Page Router ─────────────────────────────────────────────────────────────
+// ─── Page Router ──────────────────────────────────────────────────────────────
 function PageContent({ active, setActive }) {
   switch (active) {
     case "dashboard":    return <DashboardContent setActive={setActive} />;
@@ -458,9 +533,28 @@ function PageContent({ active, setActive }) {
   }
 }
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
+// ─── Root Component ───────────────────────────────────────────────────────────
 export default function DoctorDashboard() {
+  const navigate = useNavigate();
   const [active, setActive] = useState("dashboard");
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+      setUser(user);
+    };
+    getUser();
+  }, [navigate]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
 
   return (
     <div style={{ display: "flex", background: C.surface, minHeight: "100vh", fontFamily: FONT_SANS }}>
@@ -472,7 +566,7 @@ export default function DoctorDashboard() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 4px; }
       `}</style>
-      <Sidebar active={active} setActive={setActive} />
+      <Sidebar active={active} setActive={setActive} user={user} onSignOut={handleSignOut} />
       <main style={{ flex: 1, overflowY: "auto", minWidth: 0 }}>
         <PageContent active={active} setActive={setActive} />
       </main>

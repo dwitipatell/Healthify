@@ -1,50 +1,36 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "./navbar";
 import "../styles/global.css";
 import "../styles/landingPage.css";
 
-/* ── Get Started Modal ── */
-function GetStartedModal({ onClose, onLogin }) {
+export default function LandingPage() {
+  const navigate = useNavigate();
+
+  const goToLogin = () => navigate("/login");
+  const goToSignup = () => navigate("/signup");
+  const goToDoctorPortal = () => {
+    alert("Doctor Portal is coming soon!\n\nIt will have a purple theme as you requested.");
+    // navigate("/doctor-portal"); // We'll add this later
+  };
+
   return (
-    <div className="modal-overlay">
-      <div className="modal">
-        <button className="modal-back" onClick={onClose}>← Back</button>
-        <div className="modal-title">Get started</div>
-        <div className="modal-sub">Create your free patient account</div>
-        <div className="modal-form-row">
-          <div className="modal-form-group">
-            <label className="modal-label">First name</label>
-            <input className="modal-input" placeholder="Daksh" />
-          </div>
-          <div className="modal-form-group">
-            <label className="modal-label">Last name</label>
-            <input className="modal-input" placeholder="Patel" />
-          </div>
-        </div>
-        <div className="modal-form-group">
-          <label className="modal-label">Email address</label>
-          <input className="modal-input" type="email" placeholder="you@email.com" />
-        </div>
-        <div className="modal-form-group">
-          <label className="modal-label">Phone number</label>
-          <input className="modal-input" type="tel" placeholder="+91 99999 00000" />
-        </div>
-        <div className="modal-form-group">
-          <label className="modal-label">Password</label>
-          <input className="modal-input" type="password" placeholder="••••••••" />
-        </div>
-        <button className="modal-submit">Create account</button>
-        <div className="modal-signin">
-          Already have an account?{" "}
-          <span onClick={onLogin}>Sign in</span>
-        </div>
-      </div>
+    <div>
+      <Navbar onLogin={goToLogin} onSignup={goToSignup} />
+
+      <HeroSection 
+        onBookAppointment={goToSignup} 
+        onDoctorPortal={goToDoctorPortal} 
+      />
+
+      <FeaturesSection />
+      <HowItWorks onCTA={goToSignup} />
+      <Footer onLogin={goToLogin} />
     </div>
   );
 }
 
 /* ── Hero Section ── */
-function HeroSection({ onCTA }) {
+function HeroSection({ onBookAppointment, onDoctorPortal }) {
   const stats = [
     { val: "50K+", label: "Appointments booked" },
     { val: "200+", label: "Hospitals onboard" },
@@ -63,7 +49,6 @@ function HeroSection({ onCTA }) {
       <div className="hero__blob-bottom" />
 
       <div className="hero__grid">
-        {/* Left column */}
         <div>
           <div className="hero__badge">
             <div className="hero__badge-dot" />
@@ -81,10 +66,10 @@ function HeroSection({ onCTA }) {
           </p>
 
           <div className="hero__cta-group">
-            <button onClick={onCTA} className="hero__cta-primary">
+            <button onClick={onBookAppointment} className="hero__cta-primary">
               Book an Appointment →
             </button>
-            <button onClick={onCTA} className="hero__cta-secondary">
+            <button onClick={onDoctorPortal} className="hero__cta-secondary">
               Doctor Portal
             </button>
           </div>
@@ -99,7 +84,7 @@ function HeroSection({ onCTA }) {
           </div>
         </div>
 
-        {/* Right column – dashboard card */}
+        {/* Right column – dashboard preview */}
         <div className="hero__card-wrap">
           <div className="hero__card">
             <div className="hero__card-header">
@@ -109,28 +94,23 @@ function HeroSection({ onCTA }) {
 
             {appointments.map((appt, i) => (
               <div key={i} className="appt-row">
-                <div
-                  className="appt-avatar"
-                  style={{ background: appt.color + "20", color: appt.color }}
-                >
+                <div className="appt-avatar" style={{ background: appt.color + "20", color: appt.color }}>
                   {appt.avatar}
                 </div>
                 <div className="appt-info">
                   <p className="appt-name">{appt.name}</p>
-                  <p className="appt-meta">
-                    {appt.dept} · {appt.time}
-                  </p>
+                  <p className="appt-meta">{appt.dept} · {appt.time}</p>
                 </div>
                 <div className="appt-dot" style={{ background: appt.dotColor }} />
               </div>
             ))}
 
-            <button onClick={onCTA} className="hero__card-add-btn">
+            <button onClick={onBookAppointment} className="hero__card-add-btn">
               + Schedule new appointment
             </button>
           </div>
 
-          {/* Floating badge – confirmed */}
+          {/* Floating badges */}
           <div className="hero__float-badge hero__float-badge--top">
             <div className="hero__float-inner">
               <div className="hero__float-icon" style={{ background: "#D1FAE5" }}>
@@ -147,7 +127,6 @@ function HeroSection({ onCTA }) {
             </div>
           </div>
 
-          {/* Floating badge – wait time */}
           <div className="hero__float-badge hero__float-badge--bottom">
             <div className="hero__float-inner">
               <div className="hero__float-icon" style={{ background: "#EEF2FF" }}>
@@ -168,7 +147,7 @@ function HeroSection({ onCTA }) {
   );
 }
 
-/* ── Features Section ── */
+/* Keep your existing FeaturesSection, HowItWorks, and Footer */
 function FeaturesSection() {
   const features = [
     { icon: "📅", title: "Smart Scheduling", desc: "AI-powered slot suggestions based on doctor availability and patient history.", color: "#CCFBF1" },
@@ -196,7 +175,6 @@ function FeaturesSection() {
   );
 }
 
-/* ── How It Works ── */
 function HowItWorks({ onCTA }) {
   const steps = [
     { num: "01", title: "Create your account", desc: "Sign up as a patient or doctor. Hospitals can onboard their entire team in minutes." },
@@ -235,7 +213,6 @@ function HowItWorks({ onCTA }) {
   );
 }
 
-/* ── Footer ── */
 function Footer({ onLogin }) {
   return (
     <footer className="footer">
@@ -254,27 +231,5 @@ function Footer({ onLogin }) {
         <button onClick={onLogin} className="footer__signin">Sign In</button>
       </div>
     </footer>
-  );
-}
-
-/* ── Page Entry ── */
-export default function LandingPage({ onLogin, onSignup }) {
-  const [showModal, setShowModal] = useState(false);
-
-  const handleCTA = () => setShowModal(true);
-  const handleClose = () => setShowModal(false);
-
-  return (
-    <div>
-      <Navbar onLogin={onLogin} onSignup={handleCTA} />
-      <HeroSection onCTA={handleCTA} />
-      <FeaturesSection />
-      <HowItWorks onCTA={handleCTA} />
-      <Footer onLogin={onLogin} />
-
-      {showModal && (
-        <GetStartedModal onClose={handleClose} onLogin={onLogin} />
-      )}
-    </div>
   );
 }
