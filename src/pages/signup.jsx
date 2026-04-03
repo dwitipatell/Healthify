@@ -9,14 +9,24 @@ const BENEFITS = [
   "Access your full medical history anytime",
 ];
 
-export default function SignupPage({ onSwitchToLogin }) {
+export default function SignupPage({ onSwitchToLogin, onBack }) {
   const [role, setRole] = useState("patient");
+  const [fullName, setFullName] = useState("");
+  const [license, setLicense] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const isDoctor = role === "doctor";
 
   return (
     <div className="auth-page">
       <div className="auth-card">
+
+        {/* Back Button - Consistent with Login page */}
+        <button className="login-back-btn" onClick={onBack}>
+          ← Back to Home
+        </button>
+
         {/* Brand */}
         <div className="auth-card__header">
           <div className="auth-card__logo-icon">
@@ -45,7 +55,7 @@ export default function SignupPage({ onSwitchToLogin }) {
           ))}
         </ul>
 
-        {/* Role toggle */}
+        {/* Role Toggle */}
         <div className="role-toggle">
           {[["patient", "Patient"], ["doctor", "Doctor / Staff"]].map(([val, label]) => (
             <button
@@ -67,31 +77,47 @@ export default function SignupPage({ onSwitchToLogin }) {
         {/* Form */}
         <div className="auth-form">
           <input
-            placeholder="Full name"
             type="text"
+            placeholder={isDoctor ? "Dr. Priya Mehta" : "Full Name"}
             className="auth-input"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
           />
 
           {isDoctor && (
             <input
-              placeholder="Medical license / Hospital ID"
               type="text"
+              placeholder="Medical license / Hospital ID"
               className="auth-input"
+              value={license}
+              onChange={(e) => setLicense(e.target.value)}
+              required
             />
           )}
 
           <input
-            placeholder="Email address"
             type="email"
+            placeholder="Email address"
             className="auth-input"
-          />
-          <input
-            placeholder="Password"
-            type="password"
-            className="auth-input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
           />
 
-          <button className={isDoctor ? "auth-submit-doctor" : "auth-submit-patient"}>
+          <input
+            type="password"
+            placeholder="Password"
+            className="auth-input"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          <button 
+            className={isDoctor ? "auth-submit-doctor" : "auth-submit-patient"}
+            type="button"   // Change to "submit" when you connect to Supabase
+          >
             Create Account →
           </button>
         </div>

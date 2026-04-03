@@ -1,6 +1,7 @@
 /* ── Hero Section ── */
 .hero {
   min-height: 100vh;
+  width: 100%;
   background: linear-gradient(145deg, #F0FDFA 0%, #ECFDF5 50%, #FFFFFF 100%);
   padding: 120px 5% 80px;
   position: relative;
@@ -30,7 +31,8 @@
 }
 
 .hero__grid {
-  max-width: 1200px;
+  max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -148,6 +150,10 @@
 }
 
 /* Dashboard card */
+.hero__card-wrap {
+  position: relative;
+}
+
 .hero__card {
   background: #FFFFFF;
   border-radius: 24px;
@@ -300,18 +306,16 @@
   margin: 0;
 }
 
-.hero__card-wrap {
-  position: relative;
-}
-
 /* ── Features Section ── */
 .features {
   padding: 80px 5%;
+  width: 100%;
   background: #FFFFFF;
 }
 
 .features__inner {
-  max-width: 1200px;
+  max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -377,11 +381,13 @@
 /* ── How It Works ── */
 .how-it-works {
   padding: 80px 5%;
+  width: 100%;
   background: #F0FDFA;
 }
 
 .how-it-works__inner {
-  max-width: 1200px;
+  max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -467,11 +473,12 @@
 .footer {
   background: #134E4A;
   padding: 3rem 5%;
+  width: 100%;
   color: #99D6CF;
 }
 
 .footer__inner {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   display: flex;
   justify-content: space-between;
@@ -531,4 +538,136 @@
 .footer__signin:hover {
   background: rgba(204, 251, 241, 0.1);
   color: #CCFBF1;
+}
+
+/* ── Get Started Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 78, 74, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.modal {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 40px;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+}
+
+.modal-back {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: #F0FDFA;
+  border: 1px solid #B2DFDB;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4B7B76;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s ease;
+}
+
+.modal-back:hover {
+  border-color: #0D9488;
+  color: #0D9488;
+  background: #CCFBF1;
+}
+
+.modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #134E4A;
+  margin-bottom: 6px;
+}
+
+.modal-sub {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: #4B7B76;
+  margin-bottom: 28px;
+}
+
+.modal-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.modal-form-group {
+  margin-bottom: 16px;
+}
+
+.modal-label {
+  display: block;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #4B7B76;
+  margin-bottom: 5px;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #B2DFDB;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  color: #134E4A;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.modal-input:focus {
+  border-color: #0D9488;
+}
+
+.modal-submit {
+  width: 100%;
+  padding: 13px;
+  background: #0D9488;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  margin-top: 6px;
+  transition: background 0.15s ease;
+  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.3);
+}
+
+.modal-submit:hover {
+  background: #0f766e;
+}
+
+.modal-signin {
+  text-align: center;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: #4B7B76;
+  margin-top: 16px;
+}
+
+.modal-signin span {
+  color: #0D9488;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.modal-signin span:hover {
+  text-decoration: underline;
 }
