@@ -4,12 +4,14 @@ import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 import Navbar from './pages/navbar';
+import Login from './pages/login';
 
 function App() {
 
   return (
     <>
       <Navbar />
+      <Login/>
     </>
   )
 }
