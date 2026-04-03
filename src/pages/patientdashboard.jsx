@@ -3,79 +3,81 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import '../styles/patientDashboard.css';
 
-const PatientDashboard = () => {
+const PatientIntelligentDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [appointments, setAppointments] = useState([]);
+  const [nextAppt, setNextAppt] = useState(null);
+  const [queuePosition, setQueuePosition] = useState(3);
+  const [estimatedWait, setEstimatedWait] = useState(18);
+  const [noShowRisk, setNoShowRisk] = useState(12);
   const [activeNav, setActiveNav] = useState('dashboard');
 
-  // ---------- mock data (replace with real Supabase queries later) ----------
-  const mockAppointments = [
-    { id: 1, doctor: 'Dr. Priya Mehta', specialty: 'Cardiology', clinic: 'Apollo Clinic', date: 'Today', time: '2:30 PM', status: 'confirmed' },
-    { id: 2, doctor: 'Dr. Suresh Iyer', specialty: 'Dermatology', clinic: 'Skin Care Hub', date: 'Mon', time: '10:00 AM', status: 'pending' },
-    { id: 3, doctor: 'Dr. Anita Roy', specialty: 'General Physician', clinic: 'City Health', date: 'Wed', time: '4:00 PM', status: 'confirmed' },
+  const todayAppointments = [
+    {
+      id: 1,
+      doctor: "Dr. Priya Sharma",
+      specialty: "Cardiology",
+      time: "10:30 AM",
+      status: "confirmed",
+      predictedDuration: "25 min",
+      delay: 8
+    },
+    {
+      id: 2,
+      doctor: "Dr. Rohan Mehta",
+      specialty: "Orthopedics",
+      time: "02:00 PM",
+      status: "pending",
+      predictedDuration: "35 min",
+      delay: 0
+    }
   ];
-  const mockNotifs = [
-    { id: 1, text: 'Reminder: Appointment with Dr. Mehta at 2:30 PM today', time: '10 min ago', color: '#3B7DD8' },
-    { id: 2, text: 'Prescription refill due: Metformin 500mg', time: 'Yesterday', color: '#F0A500' },
-    { id: 3, text: 'Lab report ready: Blood test (CBC)', time: '2 days ago', color: '#3CB55A' },
+
+  const notifications = [
+    { id: 1, message: "Your appointment with Dr. Sharma is confirmed. Estimated wait: 18 min", time: "Just now", color: "#10B981" },
+    { id: 2, message: "No-show risk detected for future visits. Please confirm appointments.", time: "Yesterday", color: "#F59E0B" },
+    { id: 3, message: "Average wait time improved by 22% this week due to smart scheduling.", time: "2 days ago", color: "#3B82F6" },
   ];
-  const mockPastVisits = [
-    { date: 'Mar 18, 2026', doctor: 'Dr. Priya Mehta', type: 'Follow-up · Cardiology' },
-    { date: 'Mar 5, 2026', doctor: 'Dr. Suresh Iyer', type: 'Consultation · Derma' },
-    { date: 'Feb 20, 2026', doctor: 'Dr. Anita Roy', type: 'Check-up · General' },
-  ];
-  // -------------------------------------------------------------------------
 
   useEffect(() => {
-    // Get logged-in user from Supabase
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate('/login'); return; }
+      if (!user) {
+        navigate('/login');
+        return;
+      }
       setUser(user);
+      setNextAppt(todayAppointments[0]);
     };
     getUser();
-
-    // SUPABASE: fetch real appointments
-    // const fetchAppointments = async () => {
-    //   const { data, error } = await supabase
-    //     .from('appointments')
-    //     .select('*, doctors(name, specialty)')
-    //     .eq('patient_id', user.id)
-    //     .gte('date', new Date().toISOString())
-    //     .order('date', { ascending: true });
-    //   if (!error) setAppointments(data);
-    // };
-
-    setAppointments(mockAppointments);
-  }, []);
+  }, [navigate]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate('/login');
+    navigate('/');
+  };
+
+  const suggestReschedule = () => {
+    alert("Smart suggestion: Move to 11:15 AM slot (reduces predicted wait by 12 min and balances doctor load).");
   };
 
   const navItems = [
     { key: 'dashboard', icon: '🏠', label: 'Dashboard' },
     { key: 'book', icon: '📅', label: 'Book Appointment' },
     { key: 'appointments', icon: '📋', label: 'My Appointments' },
-    { key: 'records', icon: '📁', label: 'Health Records' },
-    { key: 'prescriptions', icon: '💊', label: 'Prescriptions' },
-    { key: 'notifications', icon: '🔔', label: 'Notifications', badge: 3 },
-    { key: 'settings', icon: '⚙️', label: 'Settings' },
+    { key: 'insights', icon: '📊', label: 'Smart Insights' },
+    { key: 'notifications', icon: '🔔', label: 'Alerts', badge: notifications.length },
   ];
 
-  const nextAppt = mockAppointments[0];
-
   return (
-    <div className="pd-layout">
-      {/* ── SIDEBAR ── */}
+    <div className="pd-layout" style={{ background: 'linear-gradient(145deg, #F0FDFA 0%, #ECFDF5 100%)' }}>
+      {/* Sidebar */}
       <aside className="pd-sidebar">
         <div className="pd-logo">
           <span className="pd-logo-icon">🏥</span>
           <div>
-            <div className="pd-logo-text">MediBook</div>
-            <div className="pd-logo-sub">Patient Portal</div>
+            <div className="pd-logo-text">Healthify</div>
+            <div className="pd-logo-sub">Smart Scheduling</div>
           </div>
         </div>
 
@@ -99,33 +101,38 @@ const PatientDashboard = () => {
               {user?.email?.slice(0, 2).toUpperCase() || 'RS'}
             </div>
             <div>
-              <div className="pd-user-name">{user?.user_metadata?.full_name || 'Patient'}</div>
-              <div className="pd-user-role">{user?.email || ''}</div>
+              <div className="pd-user-name">
+                {user?.user_metadata?.full_name || 'Rahul Shah'}
+              </div>
+              <div className="pd-user-role">Patient • Ahmedabad</div>
             </div>
           </div>
           <button className="pd-signout-btn" onClick={handleSignOut}>Sign out</button>
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT ── */}
+      {/* Main Content */}
       <main className="pd-main">
-        {/* Header */}
         <div className="pd-header">
           <div>
-            <h1 className="pd-greeting">Good Morning 👋</h1>
-            <p className="pd-greeting-sub">Friday, 3 Apr 2026 · Your next appointment is today</p>
+            <h1 className="pd-greeting">
+              Good morning, {user?.user_metadata?.full_name?.split(' ')[0] || 'Rahul'} 👋
+            </h1>
+            <p className="pd-greeting-sub">
+              Friday, 3 Apr 2026 • Smart system optimized your schedule
+            </p>
           </div>
           <button className="pd-primary-btn" onClick={() => setActiveNav('book')}>
-            + Book Appointment
+            + Book New Appointment
           </button>
         </div>
 
         {/* Stats */}
         <div className="pd-stats">
           {[
-            { icon: '📅', label: 'Upcoming', value: '2', badge: 'This week', badgeClass: 'blue' },
-            { icon: '✅', label: 'Completed', value: '14', badge: 'All time', badgeClass: 'green' },
-            { icon: '💊', label: 'Active Rx', value: '3', badge: '1 refill due', badgeClass: 'amber' },
+            { icon: '⏱️', label: "Est. Wait Today", value: `${estimatedWait} min`, badge: "↓ 22% this week", badgeClass: "green" },
+            { icon: '📍', label: "Queue Position", value: `#${queuePosition}`, badge: "Optimized", badgeClass: "blue" },
+            { icon: '📉', label: "No-Show Risk", value: `${noShowRisk}%`, badge: "Low", badgeClass: "amber" },
           ].map((s, i) => (
             <div className="pd-stat-card" key={i}>
               <span className="pd-stat-icon">{s.icon}</span>
@@ -137,39 +144,47 @@ const PatientDashboard = () => {
         </div>
 
         {/* Next Appointment Hero */}
-        <div className="pd-hero">
-          <div className="pd-hero-deco1"></div>
-          <div className="pd-hero-deco2"></div>
-          <div className="pd-hero-label">Next Appointment</div>
-          <div className="pd-hero-title">{nextAppt.doctor} — {nextAppt.specialty}</div>
-          <div className="pd-hero-sub">{nextAppt.clinic} · Floor 3, Room 12</div>
-          <div className="pd-hero-meta">
-            <span>🕐 {nextAppt.date}, {nextAppt.time}</span>
-            <span>⏱ 30 min</span>
-            <span>📍 In-person</span>
+        {nextAppt && (
+          <div className="pd-hero">
+            <div className="pd-hero-deco1"></div>
+            <div className="pd-hero-deco2"></div>
+            <div className="pd-hero-label">NEXT • Intelligent Slot</div>
+            <div className="pd-hero-title">{nextAppt.doctor} — {nextAppt.specialty}</div>
+            <div className="pd-hero-sub">
+              Predicted duration: {nextAppt.predictedDuration} • Current delay: +{nextAppt.delay} min
+            </div>
+            <div className="pd-hero-meta">
+              <span>🕐 Today, {nextAppt.time}</span>
+              <span>📍 In-clinic</span>
+              <span>⚡ Smart optimized</span>
+            </div>
+            <div className="pd-hero-actions">
+              <button className="pd-hero-btn-solid">View Details</button>
+              <button className="pd-hero-btn-outline" onClick={suggestReschedule}>
+                Suggest Better Slot
+              </button>
+              <button className="pd-hero-btn-outline">Reschedule</button>
+            </div>
           </div>
-          <div className="pd-hero-actions">
-            <button className="pd-hero-btn-solid">View Details</button>
-            <button className="pd-hero-btn-outline">Reschedule</button>
-            <button className="pd-hero-btn-outline">Cancel</button>
-          </div>
-        </div>
+        )}
 
         {/* Two Column */}
         <div className="pd-two-col">
-          {/* Upcoming Appointments */}
           <div className="pd-card">
             <div className="pd-card-header">
-              <span className="pd-card-title">Upcoming Appointments</span>
-              <span className="pd-card-link">View all →</span>
+              <span className="pd-card-title">Today's Appointments • AI Predicted</span>
+              <span className="pd-card-link">Full calendar →</span>
             </div>
-            {mockAppointments.map(appt => (
+            {todayAppointments.map(appt => (
               <div className="pd-appt-row" key={appt.id}>
-                <div className="pd-appt-time">{appt.date}<br />{appt.time}</div>
+                <div className="pd-appt-time">{appt.time}</div>
                 <div className={`pd-appt-dot ${appt.status === 'pending' ? 'amber' : 'blue'}`}></div>
                 <div className="pd-appt-info">
                   <div className="pd-appt-name">{appt.doctor}</div>
-                  <div className="pd-appt-detail">{appt.specialty} · {appt.clinic}</div>
+                  <div className="pd-appt-detail">
+                    {appt.specialty} • Predicted: {appt.predictedDuration} 
+                    {appt.delay > 0 && ` (+${appt.delay} min delay)`}
+                  </div>
                 </div>
                 <span className={`pd-status pd-status-${appt.status}`}>
                   {appt.status === 'confirmed' ? 'Confirmed' : 'Pending'}
@@ -178,17 +193,16 @@ const PatientDashboard = () => {
             ))}
           </div>
 
-          {/* Notifications */}
           <div className="pd-card">
             <div className="pd-card-header">
-              <span className="pd-card-title">Notifications</span>
+              <span className="pd-card-title">Smart System Alerts</span>
               <span className="pd-card-link">Mark all read</span>
             </div>
-            {mockNotifs.map(n => (
+            {notifications.map(n => (
               <div className="pd-notif" key={n.id}>
                 <div className="pd-notif-dot" style={{ background: n.color }}></div>
                 <div>
-                  <div className="pd-notif-text">{n.text}</div>
+                  <div className="pd-notif-text">{n.message}</div>
                   <div className="pd-notif-time">{n.time}</div>
                 </div>
               </div>
@@ -196,21 +210,22 @@ const PatientDashboard = () => {
           </div>
         </div>
 
-        {/* Recent Visits */}
+        {/* Queue Optimization */}
         <div className="pd-card pd-full-card">
           <div className="pd-card-header">
-            <span className="pd-card-title">Recent Visits</span>
-            <span className="pd-card-link">Download records →</span>
+            <span className="pd-card-title">Queue Optimization • Today</span>
           </div>
-          <div className="pd-visits-grid">
-            {mockPastVisits.map((v, i) => (
-              <div className="pd-visit-card" key={i}>
-                <div className="pd-visit-date">{v.date}</div>
-                <div className="pd-visit-doctor">{v.doctor}</div>
-                <div className="pd-visit-type">{v.type}</div>
-                <span className="pd-badge pd-badge-green" style={{ marginTop: 6, display: 'inline-block' }}>Completed</span>
-              </div>
-            ))}
+          <p style={{ fontSize: '15px', color: '#4B7B76', lineHeight: 1.6 }}>
+            Our AI system reduced average waiting time by <strong>22%</strong> today by dynamically 
+            adjusting slots based on historical consultation durations and no-show patterns.
+          </p>
+          <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ background: '#CCFBF1', padding: '10px 16px', borderRadius: '10px', fontSize: '13px' }}>
+              ✅ 3 no-shows predicted & slots re-allocated
+            </div>
+            <div style={{ background: '#E0F2FE', padding: '10px 16px', borderRadius: '10px', fontSize: '13px' }}>
+              📈 Doctor utilization balanced at 87%
+            </div>
           </div>
         </div>
       </main>
@@ -218,4 +233,4 @@ const PatientDashboard = () => {
   );
 };
 
-export default PatientDashboard;
+export default PatientIntelligentDashboard;

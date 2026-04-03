@@ -1,32 +1,21 @@
-import { useState } from "react";
-import LandingPage from "./pages/landingpage";
-import LoginPage from "./pages/login";
-import SignupPage from "./pages/signup";
-import { Route } from "lucide-react";
-import { BrowserRouter,Routes,Navigate }  from "react-router-dom";
-import docDashboard from "./pages/doctordashboard";
-/**
- * App entry point.
- * Pages: "landing" | "login" | "signup"
- */
-export default function App() {
-  const [page, setPage] = useState("landing");
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
+import LandingPage from "./pages/landingpage.jsx";
+import Login from "./pages/login.jsx";
+import SignupPage from "./pages/signup.jsx";
+import PatientDashboard from "./pages/patientdashboard.jsx";
+
+function App() {
   return (
-    <>
-      {page === "landing" && (
-        <LandingPage
-          onLogin={() => setPage("login")}
-          onSignup={() => setPage("signup")}
-        />
-      )}
-      {page === "login" && (
-        <LoginPage onSwitchToSignup={() => setPage("signup")} />
-      )}
-      {page === "signup" && (
-        <SignupPage onSwitchToLogin={() => setPage("login")} />
-      )}
-     
-    </>
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/patient-dashboard" element={<PatientDashboard />} />
+      </Routes>
+    </Router>
   );
 }
+<Route path="/doctor-dashboard" element={<DoctorDashboard />} />
+export default App;
