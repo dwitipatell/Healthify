@@ -36,18 +36,6 @@ const DoctorDashboard = () => {
       setUser(user);
     };
     getUser();
-
-    // SUPABASE: fetch today's appointments for doctor
-    // const fetchQueue = async () => {
-    //   const today = new Date().toISOString().split('T')[0];
-    //   const { data, error } = await supabase
-    //     .from('appointments')
-    //     .select('*, patients(name)')
-    //     .eq('doctor_id', user.id)
-    //     .eq('date', today)
-    //     .order('time', { ascending: true });
-    //   if (!error) setQueue(data);
-    // };
   }, []);
 
   const handleSignOut = async () => {

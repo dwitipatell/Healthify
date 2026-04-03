@@ -33,13 +33,8 @@ function App() {
   return (
     // <BrowserRouter>
       <Routes>
-        {/* Public */}
         <Route path="/login" element={<Login />} />
-
-        {/* Root → role redirect */}
         <Route path="/" element={<RoleRedirect />} />
-
-        {/* Patient dashboard */}
         <Route
           path="/patient-dashboard"
           element={
@@ -48,7 +43,6 @@ function App() {
             </PrivateRoute>
           }
         />
-
         {/* Doctor dashboard */}
         <Route
           path="/doctor-dashboard"
@@ -58,7 +52,6 @@ function App() {
             </PrivateRoute>
           }
         />
-
         {/* Calendar (shared component) */}
         <Route
           path="/calendar"
