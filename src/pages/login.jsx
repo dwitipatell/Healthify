@@ -32,8 +32,8 @@ export default function Login() {
   return (
     <div className="login-container">
       <div className="glass-card">
-        <h1 className="logo">SplitExpense</h1>
-        <p className="tagline">Split smart. Live better.</p>
+        <h1 className="logo">Healthify</h1>
+        <p className="tagline">Your Appointment Buddy</p>
 
         <form className="login-form" onSubmit={handleLogin}>
           <div className="login-group">
