@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { supabase } from '../services/supabase';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';  
 import '../styles/login.css';
+import "../components/Global.css";
 
 const Login = ({ onBack }) => {
   const [isSignUp, setIsSignUp] = useState(false);
