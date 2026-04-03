@@ -1,21 +1,25 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import LandingPage from "./pages/landingpage.jsx";
-import Login from "./pages/login.jsx";
-import SignupPage from "./pages/signup.jsx";
-import PatientDashboard from "./pages/patientdashboard.jsx";
+import LandingPage from "./pages/landingpage";
+import LoginPage from "./pages/login";
+import SignupPage from "./pages/signup";
+import DoctorDashboard from "./pages/doctordashboard";
+import PatientDashboard from "./pages/patientdashboard";
 
-function App() {
+export default function App() {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/doctordashboard" element={<DoctorDashboard />} />
+        <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
+        <Route path="/patientdashboard" element={<PatientDashboard />} />
         <Route path="/patient-dashboard" element={<PatientDashboard />} />
+        {/* Redirect unknown routes */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
-<Route path="/doctor-dashboard" element={<DoctorDashboard />} />
-export default App;
