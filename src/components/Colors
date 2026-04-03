@@ -1,0 +1,16 @@
+const COLORS = {
+  primary: "#0D9488",
+  primaryDark: "#0F766E",
+  primaryLight: "#CCFBF1",
+  primaryXLight: "#F0FDFA",
+  accent: "#6366F1",
+  accentLight: "#EEF2FF",
+  text: "#134E4A",
+  textMuted: "#4B7B76",
+  textLight: "#99D6CF",
+  white: "#FFFFFF",
+  surface: "#F8FFFE",
+  border: "#B2DFDB",
+};
+
+export default COLORS;

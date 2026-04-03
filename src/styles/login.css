@@ -1,0 +1,214 @@
+/* ── Login Page ── */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #F0FDFA 0%, #ECFDF5 60%, #FFFFFF 100%);
+  padding: 2rem 1rem;
+}
+
+.auth-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 420px;
+  padding: 2rem;
+  box-shadow: 0 24px 60px rgba(13, 148, 136, 0.18);
+  animation: slideUp 0.25s ease;
+}
+
+.auth-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1.75rem;
+}
+
+.auth-card__logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #0D9488;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card__logo-text {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  color: #134E4A;
+  font-size: 18px;
+}
+
+.auth-card__title {
+  font-family: 'Fraunces', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #134E4A;
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.5px;
+}
+
+.auth-card__subtitle {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: #4B7B76;
+  margin: 0 0 1.5rem;
+}
+
+/* Role toggle */
+.role-toggle {
+  display: flex;
+  background: #F0FDFA;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 1.5rem;
+}
+
+.role-toggle__btn {
+  flex: 1;
+  border: none;
+  cursor: pointer;
+  padding: 8px 0;
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  background: transparent;
+  color: #4B7B76;
+  transition: all 0.2s ease;
+}
+
+.role-toggle__btn--active-patient {
+  background: #0D9488;
+  color: #FFFFFF;
+}
+
+.role-toggle__btn--active-doctor {
+  background: #6366F1;
+  color: #FFFFFF;
+}
+
+/* Form */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #B2DFDB;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  color: #134E4A;
+  transition: border-color 0.2s ease;
+  background: #FFFFFF;
+}
+
+.auth-input:focus {
+  border-color: #0D9488;
+}
+
+.auth-input::placeholder {
+  color: #99D6CF;
+}
+
+.auth-submit-patient {
+  padding: 13px 0;
+  background: #0D9488;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.auth-submit-patient:hover {
+  background: #0F766E;
+  transform: translateY(-1px);
+}
+
+.auth-submit-doctor {
+  padding: 13px 0;
+  background: #6366F1;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.auth-submit-doctor:hover {
+  background: #4F46E5;
+  transform: translateY(-1px);
+}
+
+.auth-footer-text {
+  text-align: center;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #4B7B76;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.auth-footer-link {
+  color: #0D9488;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-footer-link:hover {
+  text-decoration: underline;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+}
+
+.auth-divider__line {
+  flex: 1;
+  height: 1px;
+  background: #B2DFDB;
+  opacity: 0.5;
+}
+
+.auth-divider__text {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: #99D6CF;
+}
+
+.auth-forgot {
+  text-align: right;
+  margin-top: -4px;
+}
+
+.auth-forgot a {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: #0D9488;
+  text-decoration: none;
+}
+
+.auth-forgot a:hover {
+  text-decoration: underline;
+}
