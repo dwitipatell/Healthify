@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "../components/Global.css";
+import "../styles/global.css";
 import "../styles/login.css";   // shared auth styles
 import "../styles/signup.css";  // signup-specific additions
 

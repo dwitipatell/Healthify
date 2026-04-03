@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Navbar from "./navbar";
-import "../styles/login.css";
-import "../components/Global.css";
+import "../styles/global.css";
 import "../styles/landingPage.css";
 
 
