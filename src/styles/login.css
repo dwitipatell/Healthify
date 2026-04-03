@@ -1,0 +1,82 @@
+/* ============================================================
+   login.css — Role-based login page  (blue=patient, red=doctor)
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0D2B5E 0%, #7A0C1E 100%);
+  font-family: 'DM Sans', sans-serif;
+  padding: 20px;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 36px 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+
+/* Logo */
+.login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+.login-logo-icon {
+  width: 42px; height: 42px; border-radius: 10px;
+  background: linear-gradient(135deg, #1A4DA8, #C0182F);
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.login-logo-name { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; color: #0D1B35; }
+.login-logo-sub  { font-size: 11px; color: #8899BB; }
+
+/* Title */
+.login-title { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: #0D1B35; }
+.login-sub   { font-size: 13px; color: #8899BB; margin-top: 4px; margin-bottom: 22px; }
+
+/* Role Selector */
+.role-selector { display: flex; gap: 8px; margin-bottom: 22px; }
+.role-btn {
+  flex: 1; padding: 10px 8px;
+  border: 1.5px solid #D4DEF0; border-radius: 10px;
+  background: #fff; font-size: 13px; font-weight: 500; color: #5A6A88;
+  cursor: pointer; transition: all .18s; font-family: 'DM Sans', sans-serif;
+}
+.role-btn:hover { border-color: #aaa; color: #333; }
+.role-active-patient { background: #E8F0FB; border-color: #1A4DA8 !important; color: #1A4DA8 !important; }
+.role-active-doctor  { background: #FDE8EB; border-color: #C0182F !important; color: #C0182F !important; }
+
+/* Form */
+.login-form { display: flex; flex-direction: column; gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: 12px; font-weight: 600; color: #5A6A88; text-transform: uppercase; letter-spacing: .5px; }
+.form-group input {
+  padding: 10px 14px; border: 1.5px solid #D4DEF0; border-radius: 8px;
+  font-size: 14px; color: #0D1B35; font-family: 'DM Sans', sans-serif;
+  outline: none; transition: border-color .15s;
+}
+.form-group input:focus { border-color: #1A4DA8; }
+
+/* Error */
+.login-error { font-size: 12px; color: #C0182F; background: #FDE8EB; padding: 8px 12px; border-radius: 6px; }
+
+/* Submit */
+.login-submit-btn {
+  padding: 12px; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; color: #fff;
+  margin-top: 4px; transition: opacity .15s;
+}
+.login-submit-btn:hover   { opacity: .88; }
+.login-submit-btn:disabled{ opacity: .6; cursor: not-allowed; }
+.btn-patient { background: linear-gradient(90deg, #1A4DA8, #3B7DD8); }
+.btn-doctor  { background: linear-gradient(90deg, #7A0C1E, #C0182F); }
+
+/* Toggle */
+.login-toggle { text-align: center; margin-top: 18px; font-size: 13px; color: #8899BB; }
+.login-toggle span { color: #1A4DA8; cursor: pointer; font-weight: 500; }
+.login-toggle span:hover { text-decoration: underline; }
