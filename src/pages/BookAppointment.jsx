@@ -15,6 +15,28 @@ import {
   formatDate,
 } from '../services/supabase';
 import { supabase } from '../services/supabase';
+import { 
+  predictConsultationDuration, 
+  initializeConsultationModel 
+} from '../services/appointmentPrediction';
+import { 
+  predictNoshowProbability,
+  initializeNoshowModel 
+} from '../services/noshowPrediction';
+import { 
+  calculateDurationFromSymptoms,
+  getSymptomsBySpecialty,
+} from '../services/symptomSeverityPredictor';
+import { 
+  calculateCurrentQueueWaitTime,
+  suggestAlternativeDoctors 
+} from '../services/queueOptimization';
+import { 
+  notifyAppointmentConfirmed,
+  notifyHighNoshowRisk,
+  notifyAlternativeDoctorAvailable,
+  notifyDoctorNewPatientInQueue,
+} from '../services/notifications';
 
 // ─── Theme ────────────────────────────
 const C = {
@@ -85,7 +107,16 @@ function StepDoctor({ onSelect }) {
   const [selected, setSelected]     = useState(null);
 
   useEffect(() => {
-    getDoctors().then(d => { setDoctors(d); setLoading(false); }).catch(() => setLoading(false));
+    getDoctors()
+      .then(d => {
+        console.log('✓ Doctors loaded:', d.length, 'doctors found');
+        setDoctors(d);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error loading doctors:', err);
+        setLoading(false);
+      });
   }, []);
 
   const filtered = doctors.filter(d => {
@@ -254,10 +285,11 @@ function StepSlot({ doctor, onSelect, onBack }) {
 
 // ─── Step 3: Patient Details + AI Duration Prediction ────────────────────────
 function StepDetails({ doctor, slot, onSubmit, onBack }) {
-  const [form, setForm] = useState({ name: '', age: '', gender: 'F', reason: COMMON_REASONS[0], notes: '' });
+  const [form, setForm] = useState({ name: '', age: '', gender: 'F', reason: COMMON_REASONS[0], notes: '', symptom: '', severity: 'moderate' });
   const [predicting, setPredicting] = useState(false);
   const [prediction, setPrediction] = useState(null); // { durationMin, noshowRisk, noshowProbability, reasoning }
   const [error, setError] = useState('');
+  const availableSymptoms = getSymptomsBySpecialty(doctor.specialty);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -265,49 +297,79 @@ function StepDetails({ doctor, slot, onSubmit, onBack }) {
     if (!form.age || !form.reason) return;
     setPredicting(true); setPrediction(null);
     try {
-      const prompt = `You are a medical scheduling AI for a hospital system.
+      // 1. Calculate duration based on SYMPTOM SEVERITY using patient's details
+      const symptomText = form.symptom ? `${form.symptom} (${form.severity})` : form.notes || form.reason;
+      const symptomPrediction = calculateDurationFromSymptoms(
+        symptomText,
+        doctor.specialty,
+        doctor.years_of_experience || 5,
+        parseInt(form.age)
+      );
 
-Predict for this upcoming appointment:
-1. Estimated consultation duration in minutes
-2. No-show risk (Low / Medium / High)
-3. No-show probability (0-100)
-4. One-line reasoning
+      const durationMin = symptomPrediction.duration;
 
-Patient:
-- Age: ${form.age}, Gender: ${form.gender === 'F' ? 'Female' : 'Male'}
-- Reason: ${form.reason}
-- Doctor specialty: ${doctor.specialty}
-- Doctor's avg consult time: ${doctor.avg_consult_min} min
-- Appointment time: ${formatTime(slot)} on ${formatDate(slot)}
-- Days until appointment: ${Math.round((slot - Date.now()) / 86400000)}
+      // 2. Predict no-show probability using ML model
+      const appointment = {
+        scheduled_at: slot.toISOString(),
+        patient_age: parseInt(form.age),
+        patient_gender: form.gender,
+        reason_for_visit: form.reason,
+        created_at: new Date().toISOString(),
+        doctors: { specialty: doctor.specialty },
+      };
 
-Respond ONLY with JSON, no markdown:
-{
-  "durationMin": <integer>,
-  "noshowRisk": "Low" | "Medium" | "High",
-  "noshowProbability": <0-100>,
-  "reasoning": "<one sentence>"
-}`;
-
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+      const noshowPrediction = await predictNoshowProbability({
+        ...appointment,
+        patient_id: supabase.auth.getUser().then(u => u.data?.user?.id),
       });
-      const data = await res.json();
-      const text = data.content?.map(b => b.text || '').join('').trim().replace(/```json|```/g, '');
-      setPrediction(JSON.parse(text));
-    } catch { /* silent — we'll use defaults */ }
+
+      // 3. Generate comprehensive reasoning
+      let reasoning = symptomPrediction.reasoning;
+      reasoning += `AI classified as: ${symptomPrediction.severity}. `;
+
+      // 4. Get current queue wait time
+      const waitMin = await calculateCurrentQueueWaitTime(doctor.id);
+      reasoning += `Queue: ${waitMin}min. `;
+
+      setPrediction({
+        durationMin,
+        noshowRisk: noshowPrediction.riskLevel === 'high' ? 'High' : noshowPrediction.riskLevel === 'medium' ? 'Medium' : 'Low',
+        noshowProbability: noshowPrediction.probability,
+        reasoning,
+        waitMin,
+        symptoms: symptomPrediction.symptoms,
+        severity: symptomPrediction.severity,
+      });
+
+      // 5. Show alternative doctor suggestions if queue is long
+      if (waitMin > 60) {
+        const alternatives = await suggestAlternativeDoctors(doctor.id, [doctor], 45);
+        if (alternatives && alternatives.length > 0) {
+          const bestAlt = alternatives[0];
+          console.log(`💡 Alternative: Dr ${bestAlt.name} has ${bestAlt.currentWaitTimeMin}min wait`);
+        }
+      }
+    } catch (err) {
+      console.error('Prediction error (will use defaults):', err);
+      // Fallback to basic prediction
+      setPrediction({
+        durationMin: doctor.avg_consult_min || 20,
+        noshowRisk: 'Low',
+        noshowProbability: 15,
+        reasoning: 'Using default estimates',
+        waitMin: 0,
+      });
+    }
     setPredicting(false);
   };
 
-  // Auto-predict when age + reason are filled
+  // Auto-predict when age + reason + symptom are filled
   useEffect(() => {
     if (form.age && parseInt(form.age) > 0) {
       const t = setTimeout(predict, 600);
       return () => clearTimeout(t);
     }
-  }, [form.age, form.reason, form.gender]);
+  }, [form.age, form.reason, form.gender, form.symptom, form.severity]);
 
   const riskColor = r => r === 'High' ? C.rose : r === 'Medium' ? C.amber : C.emerald;
   const riskBg    = r => r === 'High' ? C.roseLight : r === 'Medium' ? C.amberLight : C.emeraldLight;
@@ -343,6 +405,24 @@ Respond ONLY with JSON, no markdown:
           {COMMON_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
       </Field>
+
+      <Field label="Primary Symptom" style={{ marginBottom: 12 }}>
+        <select value={form.symptom} onChange={e => set('symptom', e.target.value)} style={inputSt}>
+          <option value="">Select a symptom (optional)</option>
+          {availableSymptoms.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        {form.symptom && <p style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, margin: '8px 0 0', textTransform: 'uppercase', letterSpacing: '.3px' }}>Symptom Severity</p>}
+      </Field>
+
+      {form.symptom && (
+        <Field label="" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[['mild','Mild'],['moderate','Moderate'],['severe','Severe']].map(([v,l]) => (
+              <button key={v} onClick={() => set('severity', v)} style={{ flex: 1, padding: '9px 0', borderRadius: 9, border: `1.5px solid ${form.severity === v ? C.primary : C.border}`, background: form.severity === v ? C.primaryXLight : C.white, fontFamily: FONT_SANS, fontSize: 13, color: form.severity === v ? C.primary : C.textMuted, fontWeight: form.severity === v ? 600 : 400, cursor: 'pointer' }}>{l}</button>
+            ))}
+          </div>
+        </Field>
+      )}
 
       <Field label="Additional Notes (optional)">
         <textarea placeholder="Any symptoms, history, or concerns…" value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} style={{ ...inputSt, resize: 'vertical' }} />
@@ -570,28 +650,51 @@ export default function BookAppointment({ onNavigateToAppointments }) {
         reason:             form.reason,
         scheduledAt:        slot.toISOString(),
         durationMin:        prediction?.durationMin || doctor.avg_consult_min,
-        noshowRisk:         prediction?.noshowRisk || null,
+        noshowRisk:         prediction?.noshowRisk === 'High' || prediction?.noshowRisk === 'Medium',
         noshowProbability:  prediction?.noshowProbability || null,
+        patientPhone:       user.user_metadata?.phone || null,
+        doctorName:         doctor.full_name,
+        clinic:             doctor.clinic,
       });
 
-      // Fire confirmation notification
-      await createNotification(
+      // Send intelligent notifications
+      const waitEstimate = prediction?.waitMin || 0;
+      await notifyAppointmentConfirmed(
         user.id,
-        'Appointment Confirmed ✓',
-        `Your appointment with ${doctor.full_name} on ${formatDate(slot)} at ${formatTime(slot)} is confirmed.`,
-        'appointment_confirmed',
-        appt.id,
+        doctor.full_name,
+        formatDate(slot),
+        formatTime(slot),
+        waitEstimate,
+        doctor.clinic || 'Main Clinic'
       );
 
-      // If high risk, fire extra reminder notification
+      // If high risk, send special reminder
       if (prediction?.noshowRisk === 'High') {
-        await createNotification(
+        await notifyHighNoshowRisk(
           user.id,
-          '⚠️ High No-show Risk Detected',
-          `Your upcoming appointment has been flagged as high risk. Please confirm attendance or reschedule if needed.`,
-          'noshow_flagged',
-          appt.id,
+          doctor.full_name,
+          formatTime(slot)
         );
+      }
+
+      // Notify the doctor about new appointment
+      try {
+        const { data: doctorUser } = await supabase
+          .from('doctors')
+          .select('user_id')
+          .eq('id', doctor.id)
+          .single();
+
+        if (doctorUser) {
+          await notifyDoctorNewPatientInQueue(
+            doctorUser.user_id,
+            form.name,
+            form.reason,
+            prediction?.durationMin || doctor.avg_consult_min || 20
+          );
+        }
+      } catch (err) {
+        console.error('Error notifying doctor:', err);
       }
 
       setBooked(appt);

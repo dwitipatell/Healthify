@@ -23,16 +23,7 @@ const Login = () => {
     setError('');
 
     if (isSignUp) {
-      // Check if email already exists with a different role
-      const { data: existingUsers } = await supabase.auth.admin.listUsers() || { data: [] };
-      const existingUser = existingUsers?.find(u => u.email === email);
-      
-      if (existingUser?.user_metadata?.role && existingUser.user_metadata.role !== role) {
-        setError(`This email is already registered as a ${existingUser.user_metadata.role}. Please login with that role instead.`);
-        setLoading(false);
-        return;
-      }
-
+      // Signup attempt
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,

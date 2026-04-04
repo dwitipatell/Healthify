@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../services/supabase";
+import { supabase, getDoctorTodayAppointments, getDailyQueueStats } from "../services/supabase";
 import LiveQueue from "./LiveQueue";
 import DoctorSettingsPage from "./DoctorSettingsPage";
 import DoctorAvailabilityManager from "./DoctorAvailabilityManager";
@@ -157,7 +157,7 @@ function Sidebar({ active, setActive, user, onSignOut }) {
 }
 
 // ── Top Bar ───────────────────────────────────────────────────────────────────
-function TopBar({ user }) {
+function TopBar({ user, queueCount = 5, appointmentCount = 12 }) {
   const now = new Date();
   const hour = now.getHours();
   const greet = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
@@ -168,7 +168,7 @@ function TopBar({ user }) {
           {greet}, Dr. {user?.user_metadata?.full_name?.split(' ')[1] || 'Doctor'} 👋
         </h1>
         <p style={{ fontFamily: FONT_SANS, fontSize: 14, color: C.textMuted, margin: "4px 0 0" }}>
-          <strong style={{ color: C.primary }}>5 patients in queue</strong> · 12 appointments today
+          <strong style={{ color: C.primary }}>{queueCount} patients in queue</strong> · {appointmentCount} appointments today
         </p>
       </div>
     </div>
@@ -176,24 +176,32 @@ function TopBar({ user }) {
 }
 
 // ── Stat Cards ────────────────────────────────────────────────────────────────
-function StatCards() {
-  const stats = [
+function StatCards({ stats = {} }) {
+  const {
+    totalAppointments = 12,
+    completedAppointments = 8,
+    currentQueueCount = 5,
+    monthlyPatients = 156,
+    rating = 4.8,
+  } = stats;
+
+  const statCards = [
     {
-      label: "Today's Appointments", value: "12", sub: "8 completed", subColor: C.primary, subBg: C.primaryXLight, iconBg: C.primary,
+      label: "Today's Appointments", value: String(totalAppointments), sub: `${completedAppointments} completed`, subColor: C.primary, subBg: C.primaryXLight, iconBg: C.primary,
       icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke="rgba(199,210,254,0.9)" strokeWidth="1.5" /><path d="M3 10h18M8 3v4M16 3v4" stroke="rgba(199,210,254,0.9)" strokeWidth="1.5" strokeLinecap="round" /></svg>
     },
     {
-      label: "Patients This Month", value: "156", sub: "↑12% from last month", subColor: C.emerald, subBg: C.emeraldLight, iconBg: C.emerald,
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="rgba(209,250,229,0.9)" strokeWidth="1.8"/><path d="M6 20v-1a6 6 0 0112 0v1" stroke="rgba(209,250,229,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      label: "Patients in Queue", value: String(currentQueueCount), sub: "live waiting", subColor: C.primary, subBg: C.primaryXLight, iconBg: C.primary,
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="rgba(199,210,254,0.9)" strokeWidth="1.8"/><path d="M6 20v-1a6 6 0 0112 0v1" stroke="rgba(199,210,254,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
     },
     {
-      label: "Avg. Rating", value: "4.8", sub: "347 reviews", subColor: C.amber, subBg: C.amberLight, iconBg: C.amber,
+      label: "Avg. Rating", value: String(rating), sub: "from 347 reviews", subColor: C.amber, subBg: C.amberLight, iconBg: C.amber,
       icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="rgba(254,243,199,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
     },
   ];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, padding: "24px 32px 0" }}>
-      {stats.map((s, i) => (
+      {statCards.map((s, i) => (
         <div key={i} style={{ background: C.white, borderRadius: 16, padding: "18px 16px", border: `1px solid ${C.border}`, position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, right: 0, width: 70, height: 70, borderRadius: "0 16px 0 70px", background: s.iconBg + "10" }} />
           <div style={{ width: 44, height: 44, borderRadius: 12, background: s.iconBg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>{s.icon}</div>
@@ -207,37 +215,115 @@ function StatCards() {
 }
 
 // ── Today's Schedule ──────────────────────────────────────────────────────────
-function TodaySchedule() {
-  const appointments = [
-    { time: "10:00 AM", patient: "Rajesh Kumar", type: "Consultation", duration: "30 min", status: "completed" },
-    { time: "10:45 AM", patient: "Priya Singh", type: "Follow-up", duration: "20 min", status: "in-progress" },
-    { time: "11:15 AM", patient: "Amit Patel", type: "Checkup", duration: "25 min", status: "upcoming" },
-    { time: "2:00 PM", patient: "Sara Gupta", type: "Consultation", duration: "30 min", status: "upcoming" },
-  ];
+function TodaySchedule({ doctorId }) {
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!doctorId) {
+      setLoading(false);
+      return;
+    }
+
+    const loadAppointments = async () => {
+      try {
+        const data = await getDoctorTodayAppointments(doctorId);
+        if (data && data.length > 0) {
+          const formatted = data.map(appt => ({
+            id: appt.id,
+            time: new Date(appt.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            patient: appt.patient_name || 'Unknown Patient',
+            type: appt.reason || 'Consultation',
+            duration: appt.predicted_duration ? `~${appt.predicted_duration} min` : appt.duration_min ? `${appt.duration_min} min` : '~20 min',
+            predictedDuration: appt.predicted_duration,
+            noshowRisk: appt.noshow_risk,
+            noshowProbability: appt.noshow_probability,
+            status: appt.status === 'completed' ? 'completed' : appt.status === 'in_progress' ? 'in-progress' : 'upcoming',
+          }));
+          setAppointments(formatted);
+        }
+      } catch (err) {
+        console.error('Error loading today\'s appointments:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAppointments();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel(`doctor-appointments-${doctorId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+          filter: `doctor_id=eq.${doctorId}`,
+        },
+        () => {
+          loadAppointments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [doctorId]);
+
+  if (loading) {
+    return (
+      <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, overflow: "hidden", marginTop: 20, padding: "20px", textAlign: "center", color: C.textMuted }}>
+        Loading today's appointments...
+      </div>
+    );
+  }
+
+  if (appointments.length === 0) {
+    return (
+      <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, overflow: "hidden", marginTop: 20, padding: "20px", textAlign: "center", color: C.textMuted }}>
+        No appointments today
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, overflow: "hidden", marginTop: 20 }}>
       <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${C.borderMuted}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 15, color: C.text, margin: 0 }}>Today's Appointments</p>
+        <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 15, color: C.text, margin: 0 }}>Today's Appointments ({appointments.length})</p>
         <button style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>View all →</button>
       </div>
       {appointments.map((appt, i) => {
         const statusColor = appt.status === 'completed' ? C.emerald : appt.status === 'in-progress' ? C.primary : C.textMuted;
         const statusBg = appt.status === 'completed' ? C.emeraldLight : appt.status === 'in-progress' ? C.primaryXLight : C.borderMuted;
+        const riskColor = appt.noshowRisk === 'high' ? C.rose : appt.noshowRisk === 'medium' ? C.amber : C.emerald;
+        const riskBg = appt.noshowRisk === 'high' ? C.roseLight : appt.noshowRisk === 'medium' ? C.amberLight : C.emeraldLight;
         return (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 20px", borderBottom: i < appointments.length - 1 ? `1px solid ${C.borderMuted}` : "none" }}>
             <div style={{ minWidth: 80 }}>
               <p style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 700, color: C.primary, margin: 0 }}>{appt.time}</p>
               <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.textMuted, margin: "2px 0 0" }}>{appt.duration}</p>
+              {appt.predictedDuration && (
+                <p style={{ fontFamily: FONT_SANS, fontSize: 10, color: C.primary, margin: "2px 0 0", fontStyle: 'italic' }}>AI: ~{appt.predictedDuration}m</p>
+              )}
             </div>
             <div style={{ width: 10, height: 10, borderRadius: "50%", background: statusColor, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 14, color: C.text, margin: 0 }}>{appt.patient}</p>
               <p style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{appt.type}</p>
             </div>
-            <span style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 600, padding: "3px 12px", borderRadius: 100, color: statusColor, background: statusBg }}>
-              {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
-            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {appt.noshowRisk && (
+                <span style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 100, color: riskColor, background: riskBg }}>
+                  Risk: {appt.noshowRisk}
+                </span>
+              )}
+              <span style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 600, padding: "3px 12px", borderRadius: 100, color: statusColor, background: statusBg }}>
+                {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
+              </span>
+            </div>
           </div>
         );
       })}
@@ -246,13 +332,41 @@ function TodaySchedule() {
 }
 
 // ── Main Dashboard Content ────────────────────────────────────────────────────
-function DashboardContent({ user }) {
+function DashboardContent({ user, doctorId }) {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!doctorId) return;
+      try {
+        const queueStats = await getDailyQueueStats(doctorId);
+        setStats(queueStats);
+      } catch (err) {
+        console.error('Error loading queue stats:', err);
+        // Use default stats on error
+        setStats({
+          totalAppointments: 12,
+          completedAppointments: 8,
+          currentQueueCount: 5,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStats();
+    // Refresh stats every 30 seconds
+    const interval = setInterval(loadStats, 30000);
+    return () => clearInterval(interval);
+  }, [doctorId]);
+
   return (
     <div>
-      <TopBar user={user} />
-      <StatCards />
+      <TopBar user={user} queueCount={stats?.currentQueueCount || 0} appointmentCount={stats?.totalAppointments || 0} />
+      <StatCards stats={stats || {}} />
       <div style={{ padding: "0 32px 40px" }}>
-        <TodaySchedule />
+        <TodaySchedule doctorId={doctorId} />
       </div>
     </div>
   );
@@ -290,17 +404,63 @@ function AnalyticsPage({ user, doctorId }) {
 }
 
 // ─── Page Router ─────────────────────────────────────────────────────────────
-function PageContent({ active, setActive, user, doctorId }) {
+function PageContent({ active, setActive, user, doctorId, loading }) {
+  // Show loading message if data not ready
+  if (loading) {
+    return (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+        <h2 style={{ fontFamily: FONT_SANS, fontSize: 18, fontWeight: 600, color: C.text, marginBottom: 8 }}>
+          Loading Your Dashboard...
+        </h2>
+        <p style={{ fontFamily: FONT_SANS, fontSize: 14, color: C.textMuted }}>
+          Just a moment while we fetch your data.
+        </p>
+      </div>
+    );
+  }
+
+  // Show setup message if doctorId is not available
+  if (!doctorId && (active === "queue" || active === "analytics")) {
+    const actionText = active === "queue" ? "access the queue" : "view analytics";
+    return (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🏥</div>
+        <h2 style={{ fontFamily: FONT_SANS, fontSize: 18, fontWeight: 600, color: C.text, marginBottom: 8 }}>
+          Doctor Profile Not Found
+        </h2>
+        <p style={{ fontFamily: FONT_SANS, fontSize: 14, color: C.textMuted, marginBottom: 20 }}>
+          We couldn't find your doctor profile. Please contact the administrator to set up your account, or return to the dashboard.
+        </p>
+        <button
+          onClick={() => setActive("dashboard")}
+          style={{
+            padding: "10px 24px",
+            background: C.primary,
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer"
+          }}
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+
   switch (active) {
-    case "dashboard":    return <DashboardContent user={user} />;
-    case "schedule":     return <SchedulePage user={user} doctorId={doctorId} />;
-    case "queue":        return <LiveQueue role="doctor" doctorId={doctorId} />;
-    case "appointments": return <SchedulePage user={user} doctorId={doctorId} />;
+    case "dashboard":    return <DashboardContent user={user} doctorId={doctorId} />;
+    case "schedule":     return doctorId ? <SchedulePage user={user} doctorId={doctorId} /> : <div style={{ padding: 40 }}>Loading...</div>;
+    case "queue":        return doctorId ? <LiveQueue role="doctor" doctorId={doctorId} /> : null;
+    case "appointments": return doctorId ? <SchedulePage user={user} doctorId={doctorId} /> : <div style={{ padding: 40 }}>Loading...</div>;
     case "records":      return <PatientRecordsPage />;
     case "prescriptions": return <PatientRecordsPage />;
-    case "analytics":    return <AnalyticsPage user={user} doctorId={doctorId} />;
+    case "analytics":    return doctorId ? <AnalyticsPage user={user} doctorId={doctorId} /> : null;
     case "settings":     return <DoctorSettingsPage />;
-    default:             return <DashboardContent user={user} />;
+    default:             return <DashboardContent user={user} doctorId={doctorId} />;
   }
 }
 
@@ -310,40 +470,54 @@ export default function DoctorDashboard() {
   const [active, setActive] = useState("dashboard");
   const [user, setUser] = useState(null);
   const [doctorId, setDoctorId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      // Check if user has doctor role
-      const userRole = user?.user_metadata?.role;
-      if (userRole && userRole !== 'doctor') {
-        // User is trying to access doctor dashboard with a different role
-        await supabase.auth.signOut();
-        localStorage.removeItem('userRole');
-        alert(`Access Denied: This account is registered as a ${userRole}. Please login with the correct role.`);
-        navigate('/login');
-        return;
-      }
-
-      setUser(user);
-      
-      // Fetch doctor ID from user ID
       try {
-        const { data: doctors } = await supabase
-          .from('doctors')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-        if (doctors) {
-          setDoctorId(doctors.id);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate('/login');
+          return;
         }
-      } catch (err) {
-        console.error('Failed to fetch doctor ID:', err);
+
+        // Check if user has doctor role
+        const userRole = user?.user_metadata?.role;
+        if (userRole && userRole !== 'doctor') {
+          // User is trying to access doctor dashboard with a different role
+          await supabase.auth.signOut();
+          localStorage.removeItem('userRole');
+          alert(`Access Denied: This account is registered as a ${userRole}. Please login with the correct role.`);
+          navigate('/login');
+          return;
+        }
+
+        setUser(user);
+        
+        // Fetch doctor ID from user ID
+        try {
+          const { data: doctors, error } = await supabase
+            .from('doctors')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle(); // Use maybeSingle instead of single to handle 0 rows gracefully
+          
+          if (error) {
+            console.error('Failed to fetch doctor record:', error);
+            setDoctorId(null);
+          } else if (doctors?.id) {
+            console.log('✅ Doctor ID loaded:', doctors.id);
+            setDoctorId(doctors.id);
+          } else {
+            console.warn('⚠️ No doctor profile found for user:', user.id);
+            setDoctorId(null);
+          }
+        } catch (err) {
+          console.error('Failed to fetch doctor ID:', err);
+          setDoctorId(null);
+        }
+      } finally {
+        setLoading(false);
       }
     };
     getUser();
@@ -366,7 +540,7 @@ export default function DoctorDashboard() {
       `}</style>
       <Sidebar active={active} setActive={setActive} user={user} onSignOut={handleSignOut} />
       <main style={{ flex: 1, overflowY: "auto", minWidth: 0, background: `linear-gradient(135deg, rgba(245, 244, 255, 0.6) 0%, rgba(238, 242, 255, 0.4) 100%)` }}>
-        <PageContent active={active} setActive={setActive} user={user} doctorId={doctorId} />
+        <PageContent active={active} setActive={setActive} user={user} doctorId={doctorId} loading={loading} />
       </main>
     </div>
   );

@@ -413,12 +413,30 @@ function UpcomingAppointments({ setActive, colors = C }) {
           <div style={{ flex: 1 }}>
             <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 14, color: C.text, margin: 0 }}>Dr. {appt.doctors?.full_name}</p>
             <p style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{appt.doctors?.specialty} · {appt.doctors?.clinic}</p>
+            {appt.predicted_duration && (
+              <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.primary, margin: "3px 0 0", fontWeight: 500 }}>
+                ⏱️ Est. {appt.predicted_duration} min {appt.noshow_risk ? `• Risk: ${appt.noshow_risk}` : ''}
+              </p>
+            )}
           </div>
 
           {/* Status badge */}
-          <span style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 100, color: appt.status === 'confirmed' ? C.primary : C.emerald, background: appt.status === 'confirmed' ? C.primaryXLight : C.emeraldLight }}>
-            {appt.status === 'confirmed' ? 'Confirmed' : 'In Progress'}
-          </span>
+          {(() => {
+            const statusConfig = {
+              'confirmed': { label: '✅ Confirmed', color: C.primary, bg: C.primaryXLight },
+              'pending': { label: '⏳ Pending', color: C.amber, bg: C.amberLight },
+              'in_progress': { label: '▶️ In Progress', color: C.emerald, bg: C.emeraldLight },
+              'completed': { label: '✔️ Completed', color: C.emerald, bg: C.emeraldLight },
+              'cancelled': { label: '❌ Cancelled', color: C.rose, bg: C.roseLight },
+              'no_show': { label: '⚠️ No-show', color: C.rose, bg: C.roseLight },
+            };
+            const config = statusConfig[appt.status] || { label: appt.status, color: C.textMuted, bg: C.border };
+            return (
+              <span style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 100, color: config.color, background: config.bg }}>
+                {config.label}
+              </span>
+            );
+          })()}
 
           {/* Quick actions */}
           <div style={{ display: "flex", gap: 6 }}>

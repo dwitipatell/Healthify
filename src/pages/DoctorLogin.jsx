@@ -59,8 +59,8 @@ const DoctorLogin = () => {
         // Also create doctor profile in doctors table
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          await supabase.from('doctors').insert({
-            id: user.id,
+          const { error: insertError } = await supabase.from('doctors').insert({
+            user_id: user.id,
             full_name: fullName,
             email,
             phone,
@@ -68,8 +68,16 @@ const DoctorLogin = () => {
             hospital,
             license_number: licenseNumber,
             years_of_experience: parseInt(yearsOfExperience),
-            status: 'active',
+            is_active: true,
+            avg_consult_min: 20,
           });
+
+          if (insertError) {
+            console.error('Error creating doctor profile:', insertError);
+            setError('Doctor profile creation failed. Please try again.');
+            setLoading(false);
+            return;
+          }
         }
 
         localStorage.setItem('userRole', 'doctor');

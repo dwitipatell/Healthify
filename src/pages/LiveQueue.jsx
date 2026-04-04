@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "../services/supabase";
+import { supabase, testCreateAppointment, debugListQueue, debugListAppointments } from "../services/supabase";
+import { calculateCurrentQueueWaitTime, suggestAlternativeDoctors, getQueueHealthReport } from "../services/queueOptimization";
+import { notifyDoctorQueueOverload, broadcastQueueUpdate } from "../services/notifications";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -130,11 +132,11 @@ export function PatientQueueView({ userId }) {
 
       const { data: appts, error: e } = await supabase
         .from("appointments")
-        .select("id, appointment_date, status, predicted_duration, doctor_id, doctors(name, specialty)")
+        .select("id, scheduled_at, status, predicted_duration, doctor_id, doctors(full_name, specialty)")
         .eq("patient_id", userId)
-        .gte("appointment_date", today + "T00:00:00")
-        .lte("appointment_date", today + "T23:59:59")
-        .in("status", ["confirmed", "in-progress"]);
+        .gte("scheduled_at", today + "T00:00:00")
+        .lte("scheduled_at", today + "T23:59:59")
+        .in("status", ["confirmed", "in_progress"]);
 
       if (e) throw e;
 
@@ -158,6 +160,7 @@ export function PatientQueueView({ userId }) {
 
       setAppointments(enriched);
     } catch (e) {
+      console.error('Patient queue error:', e);
       setError(e.message);
     } finally {
       setLoading(false);
@@ -194,7 +197,7 @@ export function PatientQueueView({ userId }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
             <div>
               <p style={{ fontWeight: 700, fontSize: 15, color: "var(--text-primary, #111)", marginBottom: 2 }}>
-                Dr. {appt.doctors?.name ?? "Unknown"}
+                Dr. {appt.doctors?.full_name ?? "Unknown"}
               </p>
               <p style={{ fontSize: 12, color: "#9ca3af" }}>{appt.doctors?.specialty}</p>
             </div>
@@ -244,11 +247,21 @@ export function DoctorQueueView({ doctorId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [debugInfo, setDebugInfo] = useState(null);
   const aiCallActive = useRef(false);
 
+  // Validate doctorId early
   useEffect(() => {
-    if (!doctorId) return;
+    if (!doctorId) {
+      setError('No doctor ID available. Please refresh the page.');
+      setLoading(false);
+      console.error('❌ DoctorQueueView mounted without doctorId:', { doctorId });
+      return;
+    }
+
+    console.log('✅ DoctorQueueView initialized with doctorId:', doctorId);
     loadQueue();
+    checkDatabaseState();
 
     const channel = supabase
       .channel("doctor-queue-" + doctorId)
@@ -261,29 +274,73 @@ export function DoctorQueueView({ doctorId }) {
     return () => supabase.removeChannel(channel);
   }, [doctorId]);
 
+  async function checkDatabaseState() {
+    try {
+      // Check if there are ANY queue entries for this doctor
+      const { data: allQueue } = await supabase
+        .from('queue')
+        .select('id, doctor_id, status, appointment_id')
+        .eq('doctor_id', doctorId);
+
+      // Check if there are ANY appointments for this doctor
+      const { data: allAppts } = await supabase
+        .from('appointments')
+        .select('id, doctor_id, patient_name, status')
+        .eq('doctor_id', doctorId)
+        .limit(5);
+
+      console.log('📊 Debug - Queue entries:', allQueue);
+      console.log('📊 Debug - Recent appointments:', allAppts);
+      
+      setDebugInfo({
+        totalQueueEntries: allQueue?.length || 0,
+        totalAppointments: allAppts?.length || 0,
+        doctorId,
+      });
+    } catch (err) {
+      console.error('Debug check failed:', err);
+    }
+  }
+
   async function loadQueue() {
     setLoading(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
-      const { data, error: e } = await supabase
+      console.log('🔍 Loading queue for doctor:', doctorId);
+      
+      // First, get all queue entries for this doctor without relationships
+      const { data: queueData, error: qErr } = await supabase
         .from("queue")
-        .select(`
-          id, status, predicted_duration, notes, created_at,
-          appointments!inner(
-            id, appointment_date, reason_for_visit, predicted_duration,
-            patients:patient_id(full_name, age, gender)
-          )
-        `)
+        .select("*")
         .eq("doctor_id", doctorId)
-        .gte("appointments.appointment_date", today + "T00:00:00")
-        .lte("appointments.appointment_date", today + "T23:59:59")
         .in("status", ["waiting", "in-progress", "delayed"])
         .order("created_at", { ascending: true });
 
-      if (e) throw e;
-      setQueue(data ?? []);
+      if (qErr) {
+        console.error('❌ Queue query error:', qErr);
+        throw qErr;
+      }
+
+      console.log('📋 Queue rows from DB:', queueData);
+
+      // Now fetch appointment data for each queue entry
+      const enrichedQueue = await Promise.all((queueData || []).map(async (qEntry) => {
+        const { data: apptData } = await supabase
+          .from("appointments")
+          .select("id, scheduled_at, reason_for_visit, predicted_duration, patient_name, patient_age, patient_gender, patient_id")
+          .eq("id", qEntry.appointment_id)
+          .single();
+
+        return {
+          ...qEntry,
+          appointments: apptData,
+        };
+      }));
+
+      console.log('✅ Queue loaded with appointments:', enrichedQueue);
+      setQueue(enrichedQueue ?? []);
     } catch (e) {
-      setError(e.message);
+      console.error('❌ Queue load error:', e);
+      setError(e.message || 'Failed to load queue');
     } finally {
       setLoading(false);
     }
@@ -311,8 +368,8 @@ export function DoctorQueueView({ doctorId }) {
           "delayed":     "Your appointment is running slightly delayed. We'll update you shortly.",
         };
         await supabase.from("notifications").insert({
-          user_id: entry.appointments?.patients?.id ?? null,
-          type: newStatus === "in-progress" ? "appointment" : "alert",
+          user_id: entry.appointments?.patient_id ?? null,
+          type: newStatus === "in-progress" ? "queue_called" : "queue_update",
           title: newStatus === "in-progress" ? "It's your turn!" : "Queue Update",
           message: msgMap[newStatus],
           is_read: false,
@@ -331,7 +388,9 @@ export function DoctorQueueView({ doctorId }) {
     setActionLoading(entry.id + "-ai");
 
     const appt = entry.appointments;
-    const patient = appt?.patients;
+    const patientName = appt?.patient_name ?? "Patient";
+    const patientAge = appt?.patient_age ?? "unknown";
+    const patientGender = appt?.patient_gender ?? "person";
 
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -343,7 +402,7 @@ export function DoctorQueueView({ doctorId }) {
           system: "You are a medical scheduling AI. Return ONLY a valid JSON object with no markdown: {\"duration_minutes\": number, \"reason\": string}",
           messages: [{
             role: "user",
-            content: `Patient: ${patient?.age ?? "unknown"} yr old ${patient?.gender ?? "person"}. Reason for visit: "${appt?.reason_for_visit ?? "general checkup"}". Predict consultation duration in minutes (5–60 range).`,
+            content: `Patient: ${patientAge} yr old ${patientGender}. Reason for visit: "${appt?.reason_for_visit ?? "general checkup"}". Predict consultation duration in minutes (5–60 range).`,
           }],
         }),
       });
@@ -380,109 +439,273 @@ export function DoctorQueueView({ doctorId }) {
     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
   };
 
-  if (loading) return <div style={card}><p style={{ color: "#9ca3af", fontSize: 14 }}>Loading queue…</p></div>;
-  if (error)   return <div style={card}><p style={{ color: "#ef4444", fontSize: 14 }}>Error: {error}</p></div>;
+  if (loading) return (
+    <div style={{ padding: "28px 32px" }}>
+      <div style={card}><p style={{ color: "#9ca3af", fontSize: 14 }}>⏳ Loading queue…</p></div>
+      <div style={{ ...card, background: "#f0fdf4", border: "1px solid #bbf7d0", marginTop: 12 }}>
+        <p style={{ fontSize: 12, color: "#166534", fontFamily: "monospace", margin: 0 }}>
+          Debug: doctorId={doctorId}, Loading...
+        </p>
+      </div>
+    </div>
+  );
+  
+  if (error) return (
+    <div style={{ padding: "28px 32px" }}>
+      <div style={card}><p style={{ color: "#ef4444", fontSize: 14 }}>❌ Error: {error}</p></div>
+      <div style={{ ...card, background: "#fef2f2", border: "1px solid #fecaca", marginTop: 12 }}>
+        <p style={{ fontSize: 12, color: "#7f1d1d", fontFamily: "monospace", margin: 0 }}>
+          Debug: doctorId={doctorId}
+        </p>
+        <p style={{ fontSize: 11, color: "#991b1b", fontFamily: "monospace", margin: "4px 0 0 0" }}>
+          Error: {error}
+        </p>
+      </div>
+    </div>
+  );
 
   return (
-    <div>
+    <div style={{ padding: "28px 32px" }}>
+      <h2 style={{ fontFamily: "Fraunces, serif", fontSize: 28, fontWeight: 700, color: "#1e1b4b", margin: "0 0 8px", letterSpacing: "-0.3px" }}>Live Queue</h2>
+      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#6b7fbd", margin: "0 0 24px" }}>Real-time patient queue management with AI-powered duration predictions</p>
+
       {/* Summary stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
-        <StatBox label="In Queue"      value={queue.length}                                               accent="var(--primary-color, #6366f1)" />
-        <StatBox label="Total Wait"    value={formatTime(totalTime)}                                     accent="#f59e0b" />
-        <StatBox label="Avg / Patient" value={queue.length ? formatTime(totalTime / queue.length) : "—"} accent="#10b981" />
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        <LiveDot />
-        <span style={{ fontSize: 13, color: "#10b981", fontWeight: 600 }}>Live Queue</span>
-        <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: "auto" }}>Updates automatically</span>
-      </div>
-
-      {withWait.length === 0 ? (
-        <div style={{ ...card, textAlign: "center", padding: "36px 24px" }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>✅</div>
-          <p style={{ fontWeight: 700, color: "var(--text-primary, #111)" }}>Queue is clear!</p>
-          <p style={{ color: "#9ca3af", fontSize: 13 }}>No patients waiting right now.</p>
+      {withWait.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 24 }}>
+          <div style={{ ...card, padding: "16px 20px" }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: "#6b7fbd", textTransform: "uppercase", margin: "0 0 6px", letterSpacing: "0.4px" }}>Patients Waiting</p>
+            <p style={{ fontSize: 28, fontWeight: 800, color: "#6366f1", margin: 0, lineHeight: 1 }}>{withWait.length}</p>
+          </div>
+          <div style={{ ...card, padding: "16px 20px" }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: "#6b7fbd", textTransform: "uppercase", margin: "0 0 6px", letterSpacing: "0.4px" }}>Total Wait</p>
+            <p style={{ fontSize: 28, fontWeight: 800, color: "#f59e0b", margin: 0, lineHeight: 1 }}>{formatTime(totalTime)}</p>
+          </div>
+          <div style={{ ...card, padding: "16px 20px" }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: "#6b7fbd", textTransform: "uppercase", margin: "0 0 6px", letterSpacing: "0.4px" }}>Avg / Patient</p>
+            <p style={{ fontSize: 28, fontWeight: 800, color: "#10b981", margin: 0, lineHeight: 1 }}>{formatTime(totalTime / withWait.length)}</p>
+          </div>
         </div>
-      ) : (
-        withWait.map((entry, idx) => {
-          const appt = entry.appointments;
-          const patient = appt?.patients;
-          const isCurrent = entry.status === "in-progress";
-          const isDelayed = entry.status === "delayed";
+      )}
 
-          return (
-            <div key={entry.id} style={{
-              ...card,
-              borderLeft: isCurrent ? "4px solid #10b981"
-                        : isDelayed ? "4px solid #f97316"
-                        : "4px solid transparent",
-              background: isCurrent ? "rgba(16,185,129,0.03)" : "var(--card-bg, #fff)",
-            }}>
-              {/* Header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{
-                    width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-                    background: isCurrent ? "#10b981" : "var(--bg-secondary, #f3f4f6)",
-                    color: isCurrent ? "#fff" : "var(--text-primary, #111)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontWeight: 800, fontSize: 13,
-                  }}>
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <p style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary, #111)", marginBottom: 2 }}>
-                      {patient?.full_name ?? "Patient"}
-                    </p>
-                    <p style={{ fontSize: 12, color: "#9ca3af" }}>
-                      {patient?.age} yrs · {patient?.gender} · {appt?.reason_for_visit ?? "General checkup"}
-                    </p>
-                  </div>
-                </div>
-                <StatusBadge status={entry.status} />
-              </div>
+      {/* Empty state */}
+      {withWait.length === 0 ? (
+        <div>
+          <div style={{
+            ...card,
+            textAlign: "center",
+            padding: "48px 32px",
+            background: "linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(129, 140, 248, 0.03) 100%)",
+            border: "2px dashed var(--border-color, #e0e7ff)",
+          }}>
+            <div style={{ fontSize: 56, marginBottom: 12, animation: "bounce 2s infinite", display: "inline-block" }}>
+              <style>{`@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }`}</style>
+              ✨
+            </div>
+            <h3 style={{ fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 700, color: "#1e1b4b", margin: "0 0 8px" }}>Queue is Clear!</h3>
+            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#6b7fbd", margin: 0 }}>No patients waiting right now. Take a well-deserved break! ☕</p>
+          </div>
 
-              {/* Stats */}
-              <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-                <MiniStat icon="⏱" label="Duration"         value={formatTime(entry.predicted_duration ?? 15)} />
-                <MiniStat icon="⌛" label={idx === 0 ? "Status" : "Wait from now"} value={idx === 0 ? "Next up" : formatTime(entry.cumulativeWait)} />
-                {entry.notes && <MiniStat icon="🤖" label="AI note" value={entry.notes} truncate />}
-              </div>
-
-              {/* Action buttons */}
-              <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-                {entry.status === "waiting" && (
-                  <ActionBtn label="Start" color="#10b981"
-                    loading={actionLoading === entry.id}
-                    onClick={() => updateStatus(entry.id, "in-progress")} />
-                )}
-                {entry.status === "in-progress" && (
-                  <ActionBtn label="Mark Complete" color="#6366f1"
-                    loading={actionLoading === entry.id}
-                    onClick={() => updateStatus(entry.id, "completed")} />
-                )}
-                {["waiting", "in-progress"].includes(entry.status) && (
-                  <ActionBtn label="Mark Delayed" color="#f97316" outlined
-                    loading={actionLoading === entry.id + "-delay"}
-                    onClick={() => updateStatus(entry.id, "delayed")} />
-                )}
-                {entry.status === "waiting" && (
-                  <ActionBtn
-                    label={actionLoading === entry.id + "-ai" ? "Predicting…" : "🤖 AI Duration"}
-                    color="#8b5cf6" outlined
-                    loading={actionLoading === entry.id + "-ai"}
-                    onClick={() => aiPredictDuration(entry)} />
-                )}
-                {entry.status === "waiting" && (
-                  <ActionBtn label="Skip" color="#ef4444" outlined
-                    loading={false}
-                    onClick={() => updateStatus(entry.id, "skipped")} />
-                )}
+          {/* Debug info - show database state */}
+          {debugInfo && (
+            <div style={{ ...card, background: "#fef3c7", border: "1px solid #fcd34d", marginTop: 16 }}>
+              <p style={{ fontSize: 12, color: "#92400e", fontWeight: 600, margin: "0 0 8px" }}>📊 Debug Info:</p>
+              <p style={{ fontSize: 11, color: "#b45309", fontFamily: "monospace", margin: "0 0 4px" }}>
+                doctorId: {debugInfo.doctorId}
+              </p>
+              <p style={{ fontSize: 11, color: "#b45309", fontFamily: "monospace", margin: "0 0 4px" }}>
+                Queue entries: {debugInfo.totalQueueEntries}
+              </p>
+              <p style={{ fontSize: 11, color: "#b45309", fontFamily: "monospace", margin: "0 0 12px" }}>
+                Appointments: {debugInfo.totalAppointments}
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={async () => {
+                    await testCreateAppointment("Debug Patient", doctorId, 35);
+                    setTimeout(loadQueue, 500);
+                  }}
+                  style={{
+                    padding: "6px 12px", fontSize: 11, background: "#f59e0b",
+                    color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600
+                  }}
+                >
+                  🧪 Create Test Appt
+                </button>
+                <button
+                  onClick={() => debugListQueue(doctorId)}
+                  style={{
+                    padding: "6px 12px", fontSize: 11, background: "#6366f1",
+                    color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600
+                  }}
+                >
+                  📋 Check Queue DB
+                </button>
+                <button
+                  onClick={() => debugListAppointments(doctorId)}
+                  style={{
+                    padding: "6px 12px", fontSize: 11, background: "#8b5cf6",
+                    color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600
+                  }}
+                >
+                  📅 Check Appts DB
+                </button>
               </div>
             </div>
-          );
-        })
+          )}
+        </div>
+      ) : (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <LiveDot />
+            <span style={{ fontSize: 13, color: "#10b981", fontWeight: 600 }}>Live Updates</span>
+            <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: "auto" }}>Updates automatically</span>
+          </div>
+
+          {/* Queue list */}
+          {withWait.map((entry, idx) => {
+            const appt = entry.appointments;
+            const isCurrent = entry.status === "in-progress";
+            const isDelayed = entry.status === "delayed";
+
+            return (
+              <div
+                key={entry.id}
+                style={{
+                  ...card,
+                  borderLeft: isCurrent 
+                    ? "5px solid #10b981" 
+                    : isDelayed 
+                    ? "5px solid #f97316" 
+                    : "5px solid #e0e7ff",
+                  background: isCurrent 
+                    ? "linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(16, 185, 129, 0.02) 100%)" 
+                    : "var(--card-bg, #fff)",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+                    {/* Queue position */}
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        background: isCurrent ? "#10b981" : idx === 0 ? "#6366f1" : "#e5e7ff",
+                        color: isCurrent || idx === 0 ? "#fff" : "#6366f1",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 800,
+                        fontSize: 16,
+                        boxShadow: isCurrent ? "0 4px 12px rgba(16, 185, 129, 0.3)" : "none",
+                      }}
+                    >
+                      {idx + 1}
+                    </div>
+
+                    {/* Patient info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        fontFamily: "Fraunces, serif",
+                        fontWeight: 700,
+                        fontSize: 16,
+                        color: "#1e1b4b",
+                        margin: "0 0 4px",
+                        wordBreak: "break-word",
+                      }}>
+                        {appt?.patient_name ?? "Patient"}
+                      </p>
+                      <p style={{
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontSize: 12,
+                        color: "#6b7fbd",
+                        margin: 0,
+                      }}>
+                        {appt?.patient_age}y • {appt?.patient_gender} • {appt?.reason_for_visit ?? "General checkup"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status badges */}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <StatusBadge status={entry.status} />
+                    {isDelayed && <span style={{ fontSize: 16 }}>⚠️</span>}
+                    {isCurrent && <span style={{ fontSize: 16 }}>👨‍⚕️</span>}
+                  </div>
+                </div>
+
+                {/* Stats row */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gap: 12,
+                  marginBottom: 14,
+                  padding: "12px",
+                  background: isCurrent ? "rgba(16, 185, 129, 0.08)" : "#f9fafb",
+                  borderRadius: 10,
+                }}>
+                  <MiniStat icon="⏱" label="Duration" value={formatTime(entry.predicted_duration ?? 15)} />
+                  <MiniStat
+                    icon="⌛"
+                    label={idx === 0 ? "Status" : "Wait from now"}
+                    value={idx === 0 ? (isCurrent ? "Being seen" : "Next up →") : formatTime(entry.cumulativeWait)}
+                  />
+                  {entry.notes && <MiniStat icon="🤖" label="AI note" value={entry.notes} truncate />}
+                </div>
+
+                {/* Action buttons */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {entry.status === "waiting" && (
+                    <ActionBtn
+                      label="▶ Start Consultation"
+                      color="#10b981"
+                      loading={actionLoading === entry.id}
+                      onClick={() => updateStatus(entry.id, "in-progress")}
+                    />
+                  )}
+                  {entry.status === "in-progress" && (
+                    <ActionBtn
+                      label="✓ Mark Complete"
+                      color="#6366f1"
+                      loading={actionLoading === entry.id}
+                      onClick={() => updateStatus(entry.id, "completed")}
+                    />
+                  )}
+                  {["waiting", "in-progress"].includes(entry.status) && (
+                    <ActionBtn
+                      label="⚠ Mark Delayed"
+                      color="#f97316"
+                      outlined
+                      loading={actionLoading === entry.id + "-delay"}
+                      onClick={() => updateStatus(entry.id, "delayed")}
+                    />
+                  )}
+                  {entry.status === "waiting" && (
+                    <ActionBtn
+                      label={actionLoading === entry.id + "-ai" ? "🤖 Predicting…" : "🤖 AI Estimate"}
+                      color="#8b5cf6"
+                      outlined
+                      loading={actionLoading === entry.id + "-ai"}
+                      onClick={() => aiPredictDuration(entry)}
+                    />
+                  )}
+                  {entry.status === "waiting" && (
+                    <ActionBtn
+                      label="✕ Skip"
+                      color="#ef4444"
+                      outlined
+                      loading={false}
+                      onClick={() => updateStatus(entry.id, "skipped")}
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

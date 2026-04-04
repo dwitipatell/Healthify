@@ -13,6 +13,7 @@ import {
   formatTime,
   formatDate,
 } from '../services/supabase';
+import { NOTIFICATION_TYPES } from '../constants/notificationKeys';
 
 // ─── Theme tokens (matches patient dashboard) ──────────────────────────────
 const C = {
@@ -73,6 +74,7 @@ function StatusBadge({ status }) {
 // ─── Appointment card ──────────────────────────────────────────────────────────
 function AppointmentCard({ appt, user, onReschedule, onCancel, loading }) {
   const [showReschedule, setShowReschedule] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -136,26 +138,27 @@ function AppointmentCard({ appt, user, onReschedule, onCancel, loading }) {
         borderRadius: 8,
       }}>
         <div>
-          <p style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, marginBottom: 2 }}>DATE & TIME</p>
+          <p style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.5px' }}>DATE & TIME</p>
           <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
             {formatDate(appt.scheduled_at)} • {formatTime(appt.scheduled_at)}
           </p>
         </div>
         <div>
-          <p style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, marginBottom: 2 }}>REASON</p>
+          <p style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.5px' }}>REASON</p>
           <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{appt.reason || 'General checkup'}</p>
         </div>
         {appt.predicted_duration && (
-          <div>
-            <p style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, marginBottom: 2 }}>EST. DURATION</p>
-            <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{appt.predicted_duration} min</p>
+          <div style={{ background: C.primaryXLight, padding: '8px 10px', borderRadius: 6 }}>
+            <p style={{ fontSize: 11, color: C.primaryDark, fontWeight: 600, marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.5px' }}>⏱️ AI Est. Duration</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: C.primary }}>{appt.predicted_duration} min</p>
           </div>
         )}
         {appt.noshow_risk && (
-          <div>
-            <p style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, marginBottom: 2 }}>NO-SHOW RISK</p>
-            <p style={{ fontSize: 14, fontWeight: 600, color: appt.noshow_risk === 'high' ? C.rose : C.amber }}>
+          <div style={{ background: appt.noshow_risk === 'high' ? C.roseLight : C.amberLight, padding: '8px 10px', borderRadius: 6 }}>
+            <p style={{ fontSize: 11, color: appt.noshow_risk === 'high' ? C.rose : C.amber, fontWeight: 600, marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.5px' }}>⚠️ NO-SHOW RISK</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: appt.noshow_risk === 'high' ? C.rose : appt.noshow_risk === 'medium' ? C.amber : C.emerald }}>
               {appt.noshow_risk.charAt(0).toUpperCase() + appt.noshow_risk.slice(1)}
+              {appt.noshow_probability && ` (${appt.noshow_probability}%)`}
             </p>
           </div>
         )}
@@ -190,7 +193,7 @@ function AppointmentCard({ appt, user, onReschedule, onCancel, loading }) {
         )}
         {canCancel && !isPast && (
           <button
-            onClick={() => onCancel(appt.id)}
+            onClick={() => setShowCancelConfirm(true)}
             disabled={loading}
             style={{
               padding: '8px 16px',
@@ -232,75 +235,285 @@ function AppointmentCard({ appt, user, onReschedule, onCancel, loading }) {
 
       {/* Reschedule modal */}
       {showReschedule && (
-        <div style={{ marginTop: 12, padding: 12, background: C.surfaceAlt, borderRadius: 8 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8 }}>Select new date:</p>
-          <input
-            type="date"
-            value={rescheduleDate}
-            onChange={(e) => {
-              setRescheduleDate(e.target.value);
-              if (e.target.value) loadSlots();
-            }}
-            style={{
-              width: '100%',
-              padding: '8px',
-              borderRadius: 6,
-              border: `1px solid ${C.border}`,
-              fontFamily: FONT_SANS,
-              marginBottom: 8,
-            }}
-          />
-          {loadingSlots && <p style={{ fontSize: 12, color: C.textMuted }}>Loading available slots...</p>}
-          {availableSlots.length > 0 && (
-            <>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 6,
-                marginBottom: 8,
-              }}>
-                {availableSlots.slice(0, 9).map((slot, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedSlot(slot)}
-                    style={{
-                      padding: '6px',
-                      borderRadius: 6,
-                      border: `1px solid ${C.border}`,
-                      background: selectedSlot === slot ? C.primary : 'transparent',
-                      color: selectedSlot === slot ? C.white : C.text,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      fontFamily: FONT_SANS,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {formatTime(slot)}
-                  </button>
-                ))}
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: C.white,
+            borderRadius: 16,
+            padding: '28px',
+            maxWidth: 500,
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+          }}>
+            <h2 style={{ fontFamily: FONT_SERIF, fontSize: 20, fontWeight: 700, color: C.text, margin: '0 0 8px' }}>
+              Reschedule Appointment
+            </h2>
+            <p style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.textMuted, margin: '0 0 20px' }}>
+              Dr. {appt.doctors?.full_name} • {appt.doctors?.specialty}
+            </p>
+
+            <div style={{ background: C.surfaceAlt, padding: '14px', borderRadius: 10, marginBottom: 20 }}>
+              <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.textMuted, fontWeight: 600, margin: '0 0 4px', textTransform: 'uppercase' }}>Current Date & Time</p>
+              <p style={{ fontFamily: FONT_SANS, fontSize: 14, fontWeight: 700, color: C.primary, margin: 0 }}>
+                {formatDate(appt.scheduled_at)} • {formatTime(appt.scheduled_at)}
+              </p>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 600, color: C.text, display: 'block', marginBottom: 8, textTransform: 'uppercase' }}>
+                Select New Date
+              </label>
+              <input
+                type="date"
+                value={rescheduleDate}
+                onChange={(e) => {
+                  setRescheduleDate(e.target.value);
+                  if (e.target.value) loadSlots();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: `1.5px solid ${C.border}`,
+                  fontFamily: FONT_SANS,
+                  fontSize: 14,
+                  color: C.text,
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {loadingSlots && (
+              <div style={{ textAlign: 'center', padding: '20px', color: C.textMuted, fontFamily: FONT_SANS, fontSize: 13 }}>
+                ⏳ Loading available time slots...
               </div>
+            )}
+
+            {rescheduleDate && availableSlots.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 600, color: C.text, display: 'block', marginBottom: 10, textTransform: 'uppercase' }}>
+                  Select New Time
+                </label>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: 8,
+                  marginBottom: 16,
+                }}>
+                  {availableSlots.slice(0, 12).map((slot, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setSelectedSlot(slot)}
+                      style={{
+                        padding: '10px 8px',
+                        borderRadius: 8,
+                        border: `2px solid ${selectedSlot === slot ? C.primary : C.border}`,
+                        background: selectedSlot === slot ? C.primaryXLight : C.white,
+                        color: selectedSlot === slot ? C.primary : C.text,
+                        fontSize: 12,
+                        fontWeight: selectedSlot === slot ? 700 : 600,
+                        fontFamily: FONT_SANS,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedSlot !== slot) {
+                          e.target.style.borderColor = C.primary;
+                          e.target.style.background = C.primaryLight;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedSlot !== slot) {
+                          e.target.style.borderColor = C.border;
+                          e.target.style.background = C.white;
+                        }
+                      }}
+                    >
+                      {formatTime(slot)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {rescheduleDate && availableSlots.length === 0 && !loadingSlots && (
+              <div style={{
+                background: C.amberLight,
+                padding: '12px',
+                borderRadius: 8,
+                marginBottom: 20,
+                color: C.amber,
+                fontFamily: FONT_SANS,
+                fontSize: 13,
+              }}>
+                ⚠️ No available slots for this date. Please choose another date.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => {
+                  setShowReschedule(false);
+                  setRescheduleDate('');
+                  setSelectedSlot(null);
+                  setAvailableSlots([]);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: 8,
+                  border: `1.5px solid ${C.border}`,
+                  background: C.white,
+                  color: C.text,
+                  fontWeight: 600,
+                  fontSize: 14,
+                  fontFamily: FONT_SANS,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = C.surfaceAlt;
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = C.white;
+                }}
+              >
+                Cancel
+              </button>
               <button
                 onClick={handleReschedule}
                 disabled={!selectedSlot || loading}
                 style={{
-                  width: '100%',
-                  padding: '8px',
-                  borderRadius: 6,
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: 8,
                   border: 'none',
-                  background: C.primary,
-                  color: C.white,
-                  fontSize: 12,
+                  background: selectedSlot && !loading ? C.primary : C.border,
+                  color: selectedSlot && !loading ? C.white : C.textMuted,
                   fontWeight: 600,
+                  fontSize: 14,
                   fontFamily: FONT_SANS,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.6 : 1,
+                  cursor: selectedSlot && !loading ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedSlot && !loading) e.target.style.background = C.primaryDark;
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedSlot && !loading) e.target.style.background = C.primary;
                 }}
               >
-                {loading ? 'Rescheduling...' : 'Confirm Reschedule'}
+                {loading ? '⏳ Rescheduling...' : '✓ Confirm Reschedule'}
               </button>
-            </>
-          )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel confirmation modal */}
+      {showCancelConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: C.white,
+            borderRadius: 16,
+            padding: '28px',
+            maxWidth: 420,
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <p style={{ fontSize: 32, margin: '0 0 12px' }}>⚠️</p>
+              <h2 style={{ fontFamily: FONT_SERIF, fontSize: 20, fontWeight: 700, color: C.text, margin: '0 0 8px' }}>
+                Cancel Appointment?
+              </h2>
+              <p style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.textMuted, margin: 0 }}>
+                This action cannot be undone. Your appointment with Dr. {appt.doctors?.full_name} will be cancelled.
+              </p>
+            </div>
+
+            <div style={{ background: C.roseLight, padding: '12px', borderRadius: 10, marginBottom: 20, fontFamily: FONT_SANS, fontSize: 12, color: C.rose }}>
+              <strong>Appointment Details:</strong><br />
+              {formatDate(appt.scheduled_at)} • {formatTime(appt.scheduled_at)}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: 8,
+                  border: `1.5px solid ${C.border}`,
+                  background: C.white,
+                  color: C.text,
+                  fontWeight: 600,
+                  fontSize: 14,
+                  fontFamily: FONT_SANS,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = C.surfaceAlt;
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = C.white;
+                }}
+              >
+                Keep Appointment
+              </button>
+              <button
+                onClick={async () => {
+                  await onCancel(appt.id);
+                  setShowCancelConfirm(false);
+                }}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: loading ? C.border : C.rose,
+                  color: loading ? C.textMuted : C.white,
+                  fontWeight: 600,
+                  fontSize: 14,
+                  fontFamily: FONT_SANS,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) e.target.style.background = '#E02E5A';
+                }}
+                onMouseLeave={(e) => {
+                  if (!loading) e.target.style.background = C.rose;
+                }}
+              >
+                {loading ? '⏳ Cancelling...' : '✕ Yes, Cancel It'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -334,8 +547,12 @@ export default function AppointmentHistory({ user }) {
   async function handleReschedule(appointmentId, newTime) {
     setActionLoading(true);
     try {
-      await rescheduleAppointment(appointmentId, newTime);
-      await createNotification(user.id, 'Appointment Rescheduled', 'Your appointment has been updated', 'appointment_update', appointmentId);
+      const appt = appointments.find(a => a.id === appointmentId);
+      const phoneNumber = user?.user_metadata?.phone || null;
+      const doctorName = appt?.doctors?.full_name || 'Your Doctor';
+      
+      await rescheduleAppointment(appointmentId, newTime, phoneNumber, doctorName);
+      // Reload appointments to show updated schedule
       await loadAppointments();
     } catch (err) {
       console.error('Reschedule failed:', err);
@@ -349,8 +566,12 @@ export default function AppointmentHistory({ user }) {
     if (!confirm('Are you sure you want to cancel this appointment?')) return;
     setActionLoading(true);
     try {
-      await cancelAppointment(appointmentId);
-      await createNotification(user.id, 'Appointment Cancelled', 'Your appointment has been cancelled', 'appointment_cancel', appointmentId);
+      const appt = appointments.find(a => a.id === appointmentId);
+      const phoneNumber = user?.user_metadata?.phone || null;
+      const doctorName = appt?.doctors?.full_name || 'Your Doctor';
+      
+      // cancelAppointment already creates the notification, so just call it
+      await cancelAppointment(appointmentId, phoneNumber, doctorName);
       await loadAppointments();
     } catch (err) {
       console.error('Cancel failed:', err);
