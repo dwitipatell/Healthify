@@ -386,7 +386,7 @@ Respond ONLY with JSON, no markdown:
 }
 
 // ─── Step 4: Confirm ──────────────────────────────────────────────────────────
-function StepConfirm({ doctor, slot, form, prediction, onConfirm, onBack, booking }) {
+function StepConfirm({ doctor, slot, form, prediction, onConfirm, onBack, booking, error }) {
   const riskColor = r => r === 'High' ? C.rose : r === 'Medium' ? C.amber : C.emerald;
 
   const rows = [
@@ -402,6 +402,13 @@ function StepConfirm({ doctor, slot, form, prediction, onConfirm, onBack, bookin
     <div>
       <h2 style={{ fontFamily: FONT_SERIF, fontSize: 22, fontWeight: 700, color: C.text, margin: '0 0 4px' }}>Confirm Booking</h2>
       <p style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.textMuted, margin: '0 0 20px' }}>Review your appointment details before confirming</p>
+
+      {error && (
+        <div style={{ background: C.roseLight, borderRadius: 12, padding: '14px 18px', marginBottom: 16, fontFamily: FONT_SANS, fontSize: 13, color: C.rose, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span>⚠️</span>
+          <span>{error}</span>
+        </div>
+      )}
 
       <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 14 }}>
         {rows.map(([label, value], i) => (
@@ -556,12 +563,18 @@ export default function BookAppointment({ onNavigateToAppointments }) {
   const [prediction, setPrediction] = useState(null);
   const [booking, setBooking]     = useState(false);
   const [booked, setBooked]       = useState(null);
+  const [error, setError]         = useState('');
   const [reschedTarget, setReschedTarget] = useState(null); // { appointment, doctor }
 
   const handleConfirm = async () => {
     setBooking(true);
+    setError('');
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('You must be logged in to book an appointment.');
+      }
+
       const appt = await bookAppointment({
         patientId:          user.id,
         doctorId:           doctor.id,
@@ -598,7 +611,11 @@ export default function BookAppointment({ onNavigateToAppointments }) {
       setBooked(appt);
       setStep(5);
     } catch (e) {
-      console.error(e);
+      const errorMsg = e.message || 'Failed to book appointment. Please try again.';
+      console.error('Booking error:', e);
+      setError(errorMsg);
+      setBooking(false);
+      return;
     }
     setBooking(false);
   };
@@ -616,7 +633,7 @@ export default function BookAppointment({ onNavigateToAppointments }) {
         {step === 1 && <StepDoctor onSelect={d => { setDoctor(d); setStep(2); }} />}
         {step === 2 && <StepSlot doctor={doctor} onSelect={s => { setSlot(s); setStep(3); }} onBack={() => setStep(1)} />}
         {step === 3 && <StepDetails doctor={doctor} slot={slot} onSubmit={(f, p) => { setForm(f); setPrediction(p); setStep(4); }} onBack={() => setStep(2)} />}
-        {step === 4 && <StepConfirm doctor={doctor} slot={slot} form={form} prediction={prediction} onConfirm={handleConfirm} onBack={() => setStep(3)} booking={booking} />}
+        {step === 4 && <StepConfirm doctor={doctor} slot={slot} form={form} prediction={prediction} onConfirm={handleConfirm} onBack={() => setStep(3)} booking={booking} error={error} />}
         {step === 5 && booked && <SuccessScreen appointment={booked} doctor={doctor} onDone={() => onNavigateToAppointments?.()} />}
       </div>
 

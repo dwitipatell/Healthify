@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import Noshowanalytics from './Noshowanalytics';
 import BookAppointment from './BookAppointment';
 import SettingsPage from './SettingsPage';
+import AppointmentHistory from './AppointmentHistory';
 
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
@@ -313,27 +314,110 @@ function NextAppointment() {
 }
 
 // ─── Upcoming Appointments ────────────────────────────────────────────────────
-function UpcomingAppointments() {
+function UpcomingAppointments({ setActive }) {
+  const [appointments, setAppointments] = React.useState([]);
+  const [starred, setStarred] = React.useState(new Set());
+  const [loading, setLoading] = React.useState(true);
+  const [autoRefresh, setAutoRefresh] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadAppointments = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data } = await supabase
+          .from('appointments')
+          .select('*, doctors(full_name, specialty, clinic)')
+          .eq('patient_id', user.id)
+          .in('status', ['confirmed', 'in_progress'])
+          .order('scheduled_at', { ascending: true })
+          .limit(3);
+        
+        setAppointments(data || []);
+      } catch (err) {
+        console.error('Failed to load appointments:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAppointments();
+    
+    if (autoRefresh) {
+      const interval = setInterval(loadAppointments, 30000); // Auto-refresh every 30s
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh]);
+
+  const toggleStar = (id) => {
+    const newStarred = new Set(starred);
+    if (newStarred.has(id)) newStarred.delete(id);
+    else newStarred.add(id);
+    setStarred(newStarred);
+  };
+
+  const formatTime = (date) => new Date(date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const isToday = (date) => new Date(date).toDateString() === new Date().toDateString();
+
   return (
     <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, overflow: "hidden" }}>
       <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${C.borderMuted}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 15, color: C.text, margin: 0 }}>Upcoming Appointments</p>
-        <button style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>View all →</button>
+        <div>
+          <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 15, color: C.text, margin: 0 }}>📅 Upcoming Appointments</p>
+          <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.textMuted, margin: "3px 0 0" }}>Next 3 appointments ({autoRefresh ? '🔄 Auto-updating' : '⏸ Manual'})</p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={() => setAutoRefresh(!autoRefresh)} style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: autoRefresh ? C.primaryXLight : C.white, color: autoRefresh ? C.primary : C.textMuted, fontFamily: FONT_SANS, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+            {autoRefresh ? '🔄 On' : '⏸ Off'}
+          </button>
+          <button onClick={() => setActive('appointments')} style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.primary, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>View all →</button>
+        </div>
       </div>
-      {mockAppointments.map((appt, i) => (
-        <div key={appt.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 20px", borderBottom: i < mockAppointments.length - 1 ? `1px solid ${C.borderMuted}` : "none" }}>
-          <div style={{ minWidth: 52, textAlign: "center" }}>
-            <p style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 700, color: C.primary, margin: 0 }}>{appt.date}</p>
-            <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.textMuted, margin: "2px 0 0" }}>{appt.time}</p>
+      
+      {loading && <p style={{ padding: "20px", fontFamily: FONT_SANS, fontSize: 13, color: C.textMuted }}>Loading appointments...</p>}
+      
+      {!loading && appointments.length === 0 && (
+        <div style={{ padding: "28px", textAlign: "center" }}>
+          <p style={{ fontFamily: FONT_SANS, fontSize: 32, margin: "0 0 8px" }}>📋</p>
+          <p style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.textMuted, margin: 0 }}>No upcoming appointments. <button onClick={() => setActive('book')} style={{ background: "none", border: "none", color: C.primary, fontWeight: 600, cursor: "pointer" }}>Book one →</button></p>
+        </div>
+      )}
+
+      {appointments.map((appt, i) => (
+        <div key={appt.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < appointments.length - 1 ? `1px solid ${C.borderMuted}` : "none" }}>
+          {/* Star/Favorite */}
+          <button onClick={() => toggleStar(appt.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "18px", padding: 0 }}>
+            {starred.has(appt.id) ? '⭐' : '☆'}
+          </button>
+
+          {/* Date & Time */}
+          <div style={{ minWidth: 60, textAlign: "center" }}>
+            <p style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 700, color: C.primary, margin: 0 }}>{formatDate(appt.scheduled_at)}</p>
+            <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.textMuted, margin: "2px 0 0" }}>{formatTime(appt.scheduled_at)}</p>
+            {isToday(appt.scheduled_at) && <span style={{ fontFamily: FONT_SANS, fontSize: 10, color: C.rose, fontWeight: 600, margin: "2px 0 0", display: "block" }}>TODAY</span>}
           </div>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: appt.status === 'confirmed' ? C.primary : C.amber, flexShrink: 0 }} />
+
+          {/* Dot indicator */}
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: isToday(appt.scheduled_at) ? C.rose : C.emerald, flexShrink: 0 }} />
+
+          {/* Doctor Info */}
           <div style={{ flex: 1 }}>
-            <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 14, color: C.text, margin: 0 }}>{appt.doctor}</p>
-            <p style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{appt.specialty} · {appt.clinic}</p>
+            <p style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 14, color: C.text, margin: 0 }}>Dr. {appt.doctors?.full_name}</p>
+            <p style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{appt.doctors?.specialty} · {appt.doctors?.clinic}</p>
           </div>
-          <span style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 600, padding: "3px 12px", borderRadius: 100, color: appt.status === 'confirmed' ? C.primary : C.amber, background: appt.status === 'confirmed' ? C.primaryXLight : C.amberLight }}>
-            {appt.status === 'confirmed' ? 'Confirmed' : 'Pending'}
+
+          {/* Status badge */}
+          <span style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 100, color: appt.status === 'confirmed' ? C.primary : C.emerald, background: appt.status === 'confirmed' ? C.primaryXLight : C.emeraldLight }}>
+            {appt.status === 'confirmed' ? 'Confirmed' : 'In Progress'}
           </span>
+
+          {/* Quick actions */}
+          <div style={{ display: "flex", gap: 6 }}>
+            <button title="View Details" style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.primary, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>👁</button>
+            <button title="Reschedule" style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.textMuted, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>↻</button>
+          </div>
         </div>
       ))}
     </div>
@@ -391,7 +475,7 @@ function DashboardContent({ setActive, user }) {
       <StatCards />
       <NextAppointment />
       <div style={{ padding: "20px 32px 0", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <UpcomingAppointments />
+        <UpcomingAppointments setActive={setActive} />
         <Notifications />
       </div>
       <div style={{ padding: "16px 32px 0" }}>
@@ -504,16 +588,10 @@ function NotificationsFullPage() {
 }
 
 // ─── Appointments Full Page ───────────────────────────────────────────────────
-function AppointmentsFullPage() {
+function AppointmentsFullPage({ user }) {
   return (
-    <div>
-      <div style={{ padding: "28px 32px 24px" }}>
-        <h2 style={{ fontFamily: FONT_SERIF, fontSize: 24, fontWeight: 700, color: C.text, margin: 0 }}>My Appointments</h2>
-        <p style={{ fontFamily: FONT_SANS, fontSize: 14, color: C.textMuted, margin: "4px 0 0" }}>All upcoming and past appointments</p>
-      </div>
-      <div style={{ padding: "0 32px" }}>
-        <UpcomingAppointments />
-      </div>
+    <div style={{ padding: "28px 32px 40px" }}>
+      <AppointmentHistory user={user} />
     </div>
   );
 }
@@ -523,7 +601,7 @@ function PageContent({ active, setActive, user }) {
   switch (active) {
     case "dashboard": return <DashboardContent setActive={setActive} user={user} />;
     case "book": return <BookAppointment onNavigateToAppointments={() => setActive('appointments')} />;
-    case "appointments": return <AppointmentsFullPage />;
+    case "appointments": return <AppointmentsFullPage user={user} />;
     case "records": return <HealthRecordsPage />;
     case "prescriptions": return <PrescriptionsPage />;
     case "notifications": return <NotificationsFullPage />;

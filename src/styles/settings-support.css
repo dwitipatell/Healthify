@@ -1,0 +1,171 @@
+/* src/styles/settings-support.css */
+/* Support for settings applied via SettingsContext */
+
+:root {
+  /* Base CSS variables for settings */
+  --font-body: 'DM Sans', sans-serif;
+  --font-heading: 'Fraunces', serif;
+  --font-size-base: 14px;
+  --radius-base: 12px;
+  --spacing-base: 12px;
+  --row-height: 40px;
+  --anim-duration: 300ms;
+  --accent-color: #0D9488;
+  --accent-light: rgba(13, 148, 136, 0.1);
+  --accent-dark: #0F766E;
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* Dark Mode Support */
+body.dark-mode {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --text-primary: #eaeaea;
+  --text-muted: #b0b0b0;
+  --border-color: #404040;
+  
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+body.dark-mode * {
+  background-color: inherit;
+  color: inherit;
+}
+
+/* High Contrast Mode */
+body.high-contrast {
+  --text-primary: #000;
+  --bg-primary: #fff;
+}
+
+body.high-contrast * {
+  border-width: 2px !important;
+}
+
+/* Color Blind Mode - Deuteranopia (Red-Green) */
+body.colorblind-mode {
+  filter: url(#deuteranopia-filter);
+}
+
+/* Accessible focus rings - always visible */
+body.focusrings-always *:focus {
+  outline: 2px solid #0D9488 !important;
+  outline-offset: 2px !important;
+}
+
+/* Reduce motion support */
+body.reduce-motion,
+body.reduce-motion * {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+  animation: none !important;
+}
+
+/* Global animations for settings */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { 
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+body.focusrings-always *:focus-visible {
+  outline: 2px solid #0D9488 !important;
+  outline-offset: 2px !important;
+}
+
+/* Reduce motion - disable all animations */
+@media (prefers-reduced-motion: reduce) {
+  body * {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
+  }
+}
+
+body.reduce-motion * {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+
+/* Motion speed presets */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn var(--anim-duration) ease-out;
+}
+
+.slide-up {
+  animation: slideUp var(--anim-duration) ease-out;
+}
+
+/* Density helpers */
+body[data-density="compact"] * {
+  --spacing-base: 8px;
+  --row-height: 32px;
+}
+
+body[data-density="spacious"] * {
+  --spacing-base: 16px;
+  --row-height: 48px;
+}
+
+/* Responsive text scaling based on font size setting */
+@supports (font-size: clamp(1rem, 1vw, 2rem)) {
+  body {
+    font-size: var(--font-size-base);
+  }
+}
+
+/* Inherited border radius */
+button, input, select, textarea, .card, .btn {
+  border-radius: var(--radius-base) !important;
+}
+
+/* Spacing utilities */
+.spacing-sm { margin: calc(var(--spacing-base) / 2); }
+.spacing-md { margin: var(--spacing-base); }
+.spacing-lg { margin: calc(var(--spacing-base) * 2); }
+
+.gap-sm { gap: calc(var(--spacing-base) / 2); }
+.gap-md { gap: var(--spacing-base); }
+.gap-lg { gap: calc(var(--spacing-base) * 2); }
+
+/* Ensure transitions respect motion settings */
+body * {
+  transition-duration: var(--anim-duration);
+}
+
+body.reduce-motion * {
+  transition: none !important;
+  animation: none !important;
+}
