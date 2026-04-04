@@ -90,17 +90,17 @@ function Sidebar({ active, setActive, user, onSignOut }) {
       {/* Logo */}
       <div style={{ padding: "24px 20px 20px", borderBottom: `1px solid ${C.sidebarBorder}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.primary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: C.primary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="3" width="18" height="18" rx="4" fill="white" opacity=".2" />
               <path d="M12 8v8M8 12h8" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           </div>
-          <div>
-            <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 17, color: C.white, margin: 0, letterSpacing: "-0.3px" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 17, color: C.white, margin: 0, letterSpacing: "-0.3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               Health<span style={{ color: C.primaryLight }}>ify</span>
             </p>
-            <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.sidebarText, margin: 0 }}>Doctor Portal</p>
+            <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.sidebarText, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Doctor Portal</p>
           </div>
         </div>
       </div>
