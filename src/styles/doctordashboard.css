@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Sora:wght@600;700&display=swap');
 
 :root {
+<<<<<<< HEAD
   --d-dark:   #7A0C1E;
   --d-mid:    #C0182F;
   --d-light:  #E8354A;
@@ -12,6 +13,17 @@
   --text:     #2A0A0E;
   --muted:    #7A5560;
   --border:   #EECED2;
+=======
+  --d-dark:   #4C1D95;
+  --d-mid:    #6B46C1;
+  --d-light:  #8B5CF6;
+  --d-pale:   #EDE9FE;
+  --surface:  #F8FAFC;
+  --white:    #FFFFFF;
+  --text:     #1E2937;
+  --muted:    #64748B;
+  --border:   #E2E8F0;
+>>>>>>> 4f68ca780b03aab9907770c835736ccd5115bf63
 }
 
 /* Layout */
@@ -23,6 +35,7 @@
   color: var(--text);
 }
 
+<<<<<<< HEAD
 /* ── Sidebar ── */
 .dd-sidebar {
   width: 220px;
@@ -30,12 +43,20 @@
   background: var(--d-dark);
   display: flex;
   flex-direction: column;
+=======
+/* Sidebar - Purple Theme */
+.dd-sidebar {
+  width: 240px;
+  background: var(--d-dark);
+  color: white;
+>>>>>>> 4f68ca780b03aab9907770c835736ccd5115bf63
   padding: 24px 0;
   position: sticky;
   top: 0;
   height: 100vh;
 }
 
+<<<<<<< HEAD
 .dd-logo {
   display: flex;
   align-items: center;
@@ -225,4 +246,116 @@
   .dd-two-col { grid-template-columns: 1fr; }
   .dd-stats   { grid-template-columns: repeat(2, 1fr); }
   .dd-main { padding: 20px 16px; }
+=======
+.dd-logo-text { 
+  font-family: 'Sora', sans-serif; 
+  font-size: 18px; 
+  font-weight: 700; 
+}
+
+.dd-nav-item {
+  padding: 12px 20px;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dd-nav-item:hover {
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+
+.dd-nav-item.active {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border-left: 4px solid #C4B5FD;
+}
+
+/* Main Content */
+.dd-main { 
+  flex: 1; 
+  padding: 32px; 
+  overflow-y: auto; 
+}
+
+.dd-greeting { 
+  font-family: 'Sora', sans-serif; 
+  font-size: 28px; 
+  font-weight: 700; 
+  color: var(--text); 
+}
+
+.dd-primary-btn {
+  background: var(--d-mid);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dd-stat-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.dd-stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--d-mid);
+}
+
+/* Keep your other styles or let me know if you want me to adjust more */
+
+@media (max-width: 900px) {
+  .dd-sidebar { display: none; }
+}
+
+@media (max-width: 768px) {
+  .dd-main {
+    padding: 16px;
+  }
+
+  .dd-greeting {
+    font-size: 24px;
+  }
+
+  .dd-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .dd-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .dd-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .dd-hero-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .dd-hero-btn-solid,
+  .dd-hero-btn-outline {
+    width: 100%;
+    text-align: center;
+  }
+
+  .dd-queue-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .dd-q-actions {
+    align-self: flex-end;
+  }
+>>>>>>> 4f68ca780b03aab9907770c835736ccd5115bf63
 }
