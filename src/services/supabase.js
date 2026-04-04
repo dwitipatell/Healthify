@@ -146,7 +146,25 @@ export const bookAppointment = async ({
     })
     .select()
     .single();
-  if (error) throw error;
+  
+  if (error) {
+    // Check if this is the position column error from a database trigger
+    if (error.message && error.message.includes('q.position')) {
+      console.warn('Database position column issue detected. This is a database-level trigger/function error that needs to be fixed in Supabase.');
+      // The appointment was likely created despite the trigger error, so we'll continue
+      // but log this for debugging
+      const { data: created } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('patient_id', patientId)
+        .eq('scheduled_at', scheduledAt)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (created) return created;
+    }
+    throw error;
+  }
   return data;
 };
 
@@ -275,7 +293,7 @@ export const getDoctorQueue = async (doctorId) => {
   const { data, error } = await supabase
     .from('queue')
     .select(`
-      id, position, status, predicted_duration, notes, updated_at,
+      id, status, predicted_duration, notes, updated_at,
       appointments!inner(
         id, scheduled_at, reason_for_visit, predicted_duration,
         patient_name, patient_age, patient_gender,
@@ -286,7 +304,7 @@ export const getDoctorQueue = async (doctorId) => {
     .gte('appointments.scheduled_at', today + 'T00:00:00')
     .lte('appointments.scheduled_at', today + 'T23:59:59')
     .in('status', ['waiting', 'in-progress', 'delayed'])
-    .order('position', { ascending: true });
+    .order('created_at', { ascending: true });
   if (error) throw error;
   return data ?? [];
 };
@@ -308,15 +326,16 @@ export const getPatientQueueStatus = async (patientId) => {
   const enriched = await Promise.all((appts ?? []).map(async (appt) => {
     const { data: qEntry } = await supabase
       .from('queue')
-      .select('id, position, status, predicted_duration')
+      .select('id, status, predicted_duration, created_at')
       .eq('appointment_id', appt.id)
       .maybeSingle();
 
+    const qEntryTime = qEntry?.created_at ? new Date(qEntry.created_at).getTime() : Date.now();
     const { data: ahead } = await supabase
       .from('queue')
       .select('predicted_duration')
       .eq('doctor_id', appt.doctor_id)
-      .lt('position', qEntry?.position ?? 999)
+      .lt('created_at', new Date(qEntryTime).toISOString())
       .in('status', ['waiting', 'in-progress']);
 
     const waitMins = (ahead ?? []).reduce((sum, e) => sum + (e.predicted_duration ?? 15), 0);
@@ -330,7 +349,7 @@ export const getPatientQueueStatus = async (patientId) => {
 export const getPatientQueuePosition = async (appointmentId) => {
   const { data, error } = await supabase
     .from('queue')
-    .select('position, predicted_duration')
+    .select('id, predicted_duration, created_at')
     .eq('appointment_id', appointmentId)
     .single();
   if (error) return null;
@@ -340,22 +359,12 @@ export const getPatientQueuePosition = async (appointmentId) => {
 /** Add an appointment to today's queue */
 export const addToQueue = async (appointmentId, doctorId) => {
   const today = new Date().toISOString().split('T')[0];
-  const { data: existing } = await supabase
-    .from('queue')
-    .select('position')
-    .eq('doctor_id', doctorId)
-    .eq('queue_date', today)
-    .order('position', { ascending: false })
-    .limit(1);
-
-  const nextPos = existing?.length ? existing[0].position + 1 : 1;
 
   const { data, error } = await supabase
     .from('queue')
     .insert({
       appointment_id: appointmentId,
       doctor_id: doctorId,
-      position: nextPos,
       queue_date: today,
       status: 'waiting',
     })
@@ -402,11 +411,11 @@ export const recomputeQueueWaitTimes = async (doctorId) => {
   const today = new Date().toISOString().split('T')[0];
   const { data: queueRows } = await supabase
     .from('queue')
-    .select('id, position, predicted_duration')
+    .select('id, created_at, predicted_duration')
     .eq('doctor_id', doctorId)
     .eq('queue_date', today)
     .in('status', ['waiting', 'in-progress', 'delayed'])
-    .order('position', { ascending: true });
+    .order('created_at', { ascending: true });
 
   if (!queueRows?.length) return;
 
@@ -561,3 +570,269 @@ export const formatDate = (date) =>
 
 export const formatWait = (minutes) =>
   minutes === 0 ? 'Now' : `~${minutes} min`;
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  NO-SHOW RISK & PREDICTION
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Calculate no-show risk based on patient history and appointment factors */
+export const calculateNoShowRisk = async (patientId, doctorId) => {
+  const { data: history } = await supabase
+    .from('appointments')
+    .select('status')
+    .eq('patient_id', patientId);
+
+  if (!history?.length) return { risk: 'low', probability: 0.05 };
+
+  const noShowCount = history.filter(a => a.status === 'no_show').length;
+  const totalCount = history.length;
+  const noShowRate = noShowCount / totalCount;
+
+  let risk = 'low';
+  let probability = noShowRate;
+
+  if (noShowRate > 0.3) {
+    risk = 'high';
+  } else if (noShowRate > 0.15) {
+    risk = 'medium';
+  }
+
+  return { risk, probability };
+};
+
+/** Predict appointment duration based on consultation history and reason */
+export const predictConsultationDuration = async (doctorId, reason) => {
+  const { data: history } = await supabase
+    .from('consult_history')
+    .select('actual_min, reason')
+    .eq('doctor_id', doctorId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (!history?.length) return 20; // default 20 minutes
+
+  // Filter by similar reason if available
+  const similarReasons = history.filter(h => 
+    h.reason?.toLowerCase().includes(reason?.toLowerCase())
+  );
+
+  const relevantHistory = similarReasons.length > 0 ? similarReasons : history;
+  const durations = relevantHistory
+    .filter(h => h.actual_min && h.actual_min > 0)
+    .map(h => h.actual_min);
+
+  if (durations.length === 0) return 20;
+
+  const avgDuration = Math.round(durations.reduce((a, b) => a + b) / durations.length);
+  return Math.max(15, Math.min(60, avgDuration)); // Clamp between 15-60 min
+};
+
+/** Get delay performance metrics for a doctor */
+export const getDoctorDelayMetrics = async (doctorId, days = 30) => {
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+
+  const { data } = await supabase
+    .from('appointments')
+    .select('scheduled_at, actual_start, actual_end, status, duration_min')
+    .eq('doctor_id', doctorId)
+    .gte('scheduled_at', from.toISOString())
+    .eq('status', 'completed');
+
+  if (!data?.length) return { avgDelay: 0, onTimeRate: 100, schedule: [] };
+
+  const delays = data
+    .filter(a => a.actual_start && a.scheduled_at)
+    .map(a => {
+      const sched = new Date(a.scheduled_at);
+      const actual = new Date(a.actual_start);
+      return (actual - sched) / (1000 * 60); // Convert to minutes
+    });
+
+  const avgDelay = delays.length > 0 
+    ? Math.round(delays.reduce((a, b) => a + b) / delays.length) 
+    : 0;
+
+  const onTimeCount = delays.filter(d => d <= 5).length; // Within 5 min is "on time"
+  const onTimeRate = Math.round((onTimeCount / delays.length) * 100);
+
+  return { avgDelay, onTimeRate, totalAppts: data.length };
+};
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  APPOINTMENT ANALYTICS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Get appointment reasons summary for analytics */
+export const getAppointmentReasonStats = async (doctorId, days = 30) => {
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+
+  const { data } = await supabase
+    .from('appointments')
+    .select('reason, status')
+    .eq('doctor_id', doctorId)
+    .gte('scheduled_at', from.toISOString());
+
+  if (!data?.length) return [];
+
+  const stats = {};
+  data.forEach(a => {
+    if (!stats[a.reason]) stats[a.reason] = { count: 0, completed: 0 };
+    stats[a.reason].count++;
+    if (a.status === 'completed') stats[a.reason].completed++;
+  });
+
+  return Object.entries(stats)
+    .map(([reason, { count, completed }]) => ({
+      reason,
+      count,
+      completed,
+      completionRate: Math.round((completed / count) * 100),
+    }))
+    .sort((a, b) => b.count - a.count);
+};
+
+/** Get patient demographics for a doctor's appointments */
+export const getPatientDemographics = async (doctorId, days = 30) => {
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+
+  const { data } = await supabase
+    .from('appointments')
+    .select('patient_age, patient_gender')
+    .eq('doctor_id', doctorId)
+    .eq('status', 'completed')
+    .gte('scheduled_at', from.toISOString());
+
+  if (!data?.length) return { genders: {}, ageGroups: {} };
+
+  const genders = {};
+  const ageGroups = {};
+
+  data.forEach(a => {
+    // Count genders
+    const g = a.patient_gender || 'unknown';
+    genders[g] = (genders[g] || 0) + 1;
+
+    // Group ages
+    const age = a.patient_age || 0;
+    let group = '0-17';
+    if (age >= 18) group = '18-30';
+    if (age >= 31) group = '31-50';
+    if (age >= 51) group = '51-65';
+    if (age >= 66) group = '65+';
+
+    ageGroups[group] = (ageGroups[group] || 0) + 1;
+  });
+
+  return { genders, ageGroups };
+};
+
+/** Get top available time slots for booking (considering doctor load) */
+export const getOptimalBookingSlots = async (doctorId, date, count = 5) => {
+  const slots = await getAvailableSlots(doctorId, date);
+  if (!slots.length) return [];
+
+  // Get current queue load throughout the day
+  const appointments = await getBookedSlots(doctorId, date);
+  
+  // Score slots based on minimal surrounding appointments
+  const scored = slots.map(slot => {
+    const slotTime = slot.getTime();
+    // Count appointments within 2 hours
+    const nearby = appointments.filter(a => {
+      const aTime = new Date(a.scheduled_at).getTime();
+      return Math.abs(aTime - slotTime) < 2 * 60 * 60 * 1000;
+    }).length;
+    return { slot, load: nearby };
+  });
+
+  return scored
+    .sort((a, b) => a.load - b.load)
+    .slice(0, count)
+    .map(s => s.slot);
+};
+
+/** Reschedule appointment with load balancing */
+export const smartRescheduleAppointment = async (appointmentId, doctorId, preferredDate) => {
+  const { data: appt } = await supabase
+    .from('appointments')
+    .select('reason, duration_min, patient_id')
+    .eq('id', appointmentId)
+    .single();
+
+  if (!appt) throw new Error('Appointment not found');
+
+  const optimalSlots = await getOptimalBookingSlots(doctorId, preferredDate, 1);
+  if (!optimalSlots.length) throw new Error('No available slots on preferred date');
+
+  return rescheduleAppointment(appointmentId, optimalSlots[0].toISOString());
+};
+
+/** Update queue after checking in a patient */
+export const patientCheckIn = async (appointmentId, doctorId) => {
+  const { data: qEntry } = await supabase
+    .from('queue')
+    .select('id')
+    .eq('appointment_id', appointmentId)
+    .single();
+
+  if (qEntry) {
+    await checkInPatient(qEntry.id);
+  }
+
+  // Move to in-progress if checking in
+  await startConsultation(appointmentId);
+  await recomputeQueueWaitTimes(doctorId);
+};
+
+/** Send automated appointment reminder notification */
+export const sendAppointmentReminder = async (appointmentId, userId) => {
+  const { data: appt } = await supabase
+    .from('appointments')
+    .select('scheduled_at, doctors(full_name)')
+    .eq('id', appointmentId)
+    .single();
+
+  if (!appt) return;
+
+  const time = formatTime(appt.scheduled_at);
+  const doctor = appt.doctors?.full_name || 'Your doctor';
+
+  await createNotification(
+    userId,
+    'Upcoming Appointment',
+    `Your appointment with ${doctor} is at ${time}`,
+    'appointment_reminder',
+    appointmentId
+  );
+};
+
+/** Send delay notification to all waiting patients */
+export const notifyQueueDelay = async (doctorId, delayMinutes) => {
+  const { data: queue } = await supabase
+    .from('queue')
+    .select('appointments(patient_id)')
+    .eq('doctor_id', doctorId)
+    .in('status', ['waiting', 'in-progress']);
+
+  if (!queue?.length) return;
+
+  const promises = queue.map(q => {
+    const patientId = q.appointments?.patient_id;
+    if (patientId) {
+      return createNotification(
+        patientId,
+        'Queue Delay Notice',
+        `Doctor is running ${delayMinutes} minutes behind schedule`,
+        'queue_delay',
+        doctorId
+      );
+    }
+  });
+
+  await Promise.all(promises);
+};

@@ -8,10 +8,7 @@ export default function LandingPage() {
 
   const goToLogin = () => navigate("/login");
   const goToSignup = () => navigate("/signup");
-  const goToDoctorPortal = () => {
-    alert("Doctor Portal is coming soon!\n\nIt will have a purple theme as you requested.");
-    // navigate("/doctor-portal"); // We'll add this later
-  };
+  const goToDoctorPortal = () => navigate("/doctor-login");
 
   return (
     <div>
