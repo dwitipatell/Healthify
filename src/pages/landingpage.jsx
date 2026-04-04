@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import Navbar from "./navbar";
 import "../styles/global.css";
-import "../styles/landingPage.css";
+import "../styles/landingpage.css";
 
 export default function LandingPage() {
   const navigate = useNavigate();
