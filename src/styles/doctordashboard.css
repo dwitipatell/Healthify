@@ -98,3 +98,48 @@
 @media (max-width: 900px) {
   .dd-sidebar { display: none; }
 }
+
+@media (max-width: 768px) {
+  .dd-main {
+    padding: 16px;
+  }
+
+  .dd-greeting {
+    font-size: 24px;
+  }
+
+  .dd-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .dd-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .dd-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .dd-hero-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .dd-hero-btn-solid,
+  .dd-hero-btn-outline {
+    width: 100%;
+    text-align: center;
+  }
+
+  .dd-queue-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .dd-q-actions {
+    align-self: flex-end;
+  }
+}
