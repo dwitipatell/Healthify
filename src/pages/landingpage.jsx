@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import Navbar from "./navbar";
+import FAQSection from "../components/FAQs";
 import "../styles/global.css";
 import "../styles/landingpage.css";
 
@@ -21,6 +22,7 @@ export default function LandingPage() {
 
       <FeaturesSection />
       <HowItWorks onCTA={goToSignup} />
+      <FAQSection />
       <Footer onLogin={goToLogin} />
     </div>
   );
@@ -154,7 +156,7 @@ function FeaturesSection() {
   ];
 
   return (
-    <section className="features">
+    <section id="features" className="features">
       <div className="features__inner">
         <p className="section-eyebrow">Why Healthify</p>
         <h2 className="section-heading">Everything your hospital needs</h2>
@@ -180,7 +182,7 @@ function HowItWorks({ onCTA }) {
   ];
 
   return (
-    <section className="how-it-works">
+    <section id="how-it-works" className="how-it-works">
       <div className="how-it-works__inner">
         <p className="section-eyebrow">Simple Process</p>
         <h2 className="section-heading">Up and running in 3 steps</h2>
@@ -214,18 +216,38 @@ function Footer({ onLogin }) {
   return (
     <footer className="footer">
       <div className="footer__inner">
-        <div>
+        <div className="footer__brand-section">
           <span className="footer__brand-name">
             Health<span>ify</span>
           </span>
           <p className="footer__tagline">Smart appointment scheduling for hospitals</p>
         </div>
-        <div className="footer__links">
-          {["Privacy Policy", "Terms of Service", "Contact"].map((l) => (
-            <a key={l} href="#" className="footer__link">{l}</a>
-          ))}
+
+        <div className="footer__nav-section">
+          <div className="footer__nav-group">
+            <h4 className="footer__nav-title">Product</h4>
+            <a href="#features" className="footer__nav-link">Features</a>
+            <a href="#how-it-works" className="footer__nav-link">How it works</a>
+            <a href="#faq" className="footer__nav-link">FAQs</a>
+          </div>
+
+          <div className="footer__nav-group">
+            <h4 className="footer__nav-title">Support</h4>
+            <a href="#" className="footer__nav-link">Help Center</a>
+            <a href="#" className="footer__nav-link">Contact</a>
+            <a href="#" className="footer__nav-link">Privacy Policy</a>
+          </div>
         </div>
-        <button onClick={onLogin} className="footer__signin">Sign In</button>
+      </div>
+
+      <div className="footer__bottom">
+        <div className="footer__bottom-inner">
+          <p className="footer__copyright">© 2026 Healthify. All rights reserved.</p>
+          <div className="footer__bottom-links">
+            <a href="#" className="footer__bottom-link">Terms & Conditions</a>
+            <a href="#" className="footer__bottom-link">Privacy Policy</a>
+          </div>
+        </div>
       </div>
     </footer>
   );
