@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import Noshowanalytics from './Noshowanalytics';
+import BookAppointment from './BookAppointment';
+import SettingsPage from './SettingsPage';
+
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -77,6 +81,7 @@ const NAV_ITEMS = [
   { id: "records", label: "Health Records", icon: FolderIcon },
   { id: "prescriptions", label: "Prescriptions", icon: PillIcon },
   { id: "notifications", label: "Notifications", icon: BellIcon, badge: 3 },
+  { id: "noshow", label: "No-show AI", icon: BrainIcon },
   { id: "settings", label: "Settings", icon: GearIcon },
 ];
 
@@ -124,6 +129,13 @@ function BellIcon({ size = 16, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <path d="M15 17H9v1a3 3 0 006 0v-1zm-3-13a6 6 0 016 6v3l2 2H4l2-2v-3a6 6 0 016-6z" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function BrainIcon({ size = 16, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M9.5 2a4.5 4.5 0 014 2.5A4.5 4.5 0 0118 9a4.5 4.5 0 01-1.5 8.5M9.5 2A4.5 4.5 0 006 9a4.5 4.5 0 001.5 8.5M9.5 2v18M9.5 20h5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -510,11 +522,13 @@ function AppointmentsFullPage() {
 function PageContent({ active, setActive, user }) {
   switch (active) {
     case "dashboard": return <DashboardContent setActive={setActive} user={user} />;
-    case "book": return <BookAppointmentPage />;
+    case "book": return <BookAppointment onNavigateToAppointments={() => setActive('appointments')} />;
     case "appointments": return <AppointmentsFullPage />;
     case "records": return <HealthRecordsPage />;
     case "prescriptions": return <PrescriptionsPage />;
     case "notifications": return <NotificationsFullPage />;
+    case "noshow": return <Noshowanalytics />;
+    case "settings": return <SettingsPage />;
     default: return <DashboardContent setActive={setActive} user={user} />;
   }
 }
@@ -532,6 +546,18 @@ export default function PatientDashboard() {
         navigate('/login');
         return;
       }
+
+      // Check if user has patient role
+      const userRole = user?.user_metadata?.role;
+      if (userRole && userRole !== 'patient') {
+        // User is trying to access patient dashboard with a different role
+        await supabase.auth.signOut();
+        localStorage.removeItem('userRole');
+        alert(`Access Denied: This account is registered as a ${userRole}. Please login with the correct role.`);
+        navigate('/login');
+        return;
+      }
+
       setUser(user);
     };
     getUser();

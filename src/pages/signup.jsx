@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../services/supabase";
 import "../styles/global.css";
 import "../styles/login.css";
 import "../styles/signup.css";
@@ -18,11 +19,50 @@ export default function SignupPage() {
   const [license, setLicense] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const isDoctor = role === "doctor";
 
   const handleBackToHome = () => navigate("/");
   const handleGoToLogin = () => navigate("/login");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            role,
+            ...(isDoctor && license ? { license } : {}),
+          },
+        },
+      });
+
+      if (signUpError) {
+        // If error is about existing user, check their role
+        if (signUpError.message?.includes("already registered")) {
+          setError("This email is already registered. Please try logging in instead.");
+        } else {
+          setError(signUpError.message);
+        }
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem("userRole", role);
+      window.location.href = isDoctor ? "/doctor-dashboard" : "/patient-dashboard";
+    } catch (err) {
+      setError("Something went wrong. Please check your connection and try again.");
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="auth-page">
@@ -31,12 +71,58 @@ export default function SignupPage() {
         <div className="auth-bg-dashboard" />
       </div>
 
+      <style>{`
+        .auth-card {
+          background: rgba(255, 255, 255, 0.88);
+          border: 1.5px solid rgba(255, 255, 255, 0.6);
+        }
+
+        .role-toggle__btn--active-doctor {
+          background: #6366F1 !important;
+          color: white !important;
+          border-color: #6366F1 !important;
+        }
+
+        .auth-submit-doctor {
+          background: #6366F1 !important;
+          box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35) !important;
+        }
+
+        .auth-submit-doctor:hover {
+          background: #4F46E5 !important;
+        }
+
+        ${isDoctor ? `
+          .auth-card__logo-text { color: #1E1B4B; }
+          .auth-card__title { color: #1E1B4B; }
+          .auth-card__subtitle { color: #6B7FBD; }
+          .signup-benefit { color: #6B7FBD; }
+          .signup-benefit__icon { background: #EEF2FF; }
+          .signup-benefit__icon svg path { stroke: #6366F1; }
+          .auth-input { border-color: rgba(99, 102, 241, 0.2); }
+          .auth-input:focus { border-color: rgba(99, 102, 241, 0.5); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+          .auth-footer-link { color: #6366F1; }
+          .auth-error { background: #FEE2E2; color: #991B1B; }
+        ` : `
+          .auth-card__logo-text { color: #134E4A; }
+          .auth-card__title { color: #134E4A; }
+          .auth-card__subtitle { color: #4B7B76; }
+          .signup-benefit { color: #4B7B76; }
+          .signup-benefit__icon { background: #CCFBF1; }
+          .signup-benefit__icon svg path { stroke: #0D9488; }
+          .auth-input { border-color: rgba(13, 148, 136, 0.2); }
+          .auth-input:focus { border-color: rgba(13, 148, 136, 0.5); box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); }
+          .auth-footer-link { color: #0D9488; }
+        `}
+      `}</style>
+
       <div className="auth-card">
 
         {/* Back Button */}
-        <button 
-          className="login-back-btn" 
+        <button
+          className="login-back-btn"
           onClick={handleBackToHome}
+          type="button"
         >
           ← Back to Home
         </button>
@@ -73,10 +159,11 @@ export default function SignupPage() {
         <div className="role-toggle">
           {[
             ["patient", "Patient"],
-            ["doctor", "Doctor / Staff"]
+            ["doctor", "Doctor / Staff"],
           ].map(([val, label]) => (
             <button
               key={val}
+              type="button"
               onClick={() => setRole(val)}
               className={`role-toggle__btn ${
                 role === val
@@ -92,7 +179,7 @@ export default function SignupPage() {
         </div>
 
         {/* Form */}
-        <div className="auth-form">
+        <form className="auth-form" onSubmit={handleSubmit}>
           <input
             type="text"
             placeholder={isDoctor ? "Dr. Priya Mehta" : "Full Name"}
@@ -109,7 +196,6 @@ export default function SignupPage() {
               className="auth-input"
               value={license}
               onChange={(e) => setLicense(e.target.value)}
-              required
             />
           )}
 
@@ -124,20 +210,24 @@ export default function SignupPage() {
 
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Password (min. 6 characters)"
             className="auth-input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            minLength={6}
             required
           />
 
-          <button 
+          {error && <div className="auth-error">{error}</div>}
+
+          <button
+            type="submit"
             className={isDoctor ? "auth-submit-doctor" : "auth-submit-patient"}
-            type="button"
+            disabled={loading}
           >
-            Create Account →
+            {loading ? "Creating account…" : "Create Account →"}
           </button>
-        </div>
+        </form>
 
         <p className="signup-terms">
           By signing up you agree to our{" "}
