@@ -141,7 +141,7 @@ export function PatientQueueView({ userId }) {
       const enriched = await Promise.all((appts ?? []).map(async (appt) => {
         const { data: qEntry } = await supabase
           .from("queue")
-          .select("position, status, predicted_duration")
+          .select("id, status, predicted_duration, created_at")
           .eq("appointment_id", appt.id)
           .maybeSingle();
 
@@ -149,7 +149,7 @@ export function PatientQueueView({ userId }) {
           .from("queue")
           .select("predicted_duration")
           .eq("doctor_id", appt.doctor_id)
-          .lt("position", qEntry?.position ?? 999)
+          .lt("created_at", qEntry?.created_at ?? new Date().toISOString())
           .in("status", ["waiting", "in-progress"]);
 
         const waitMins = (ahead ?? []).reduce((sum, e) => sum + (e.predicted_duration ?? 15), 0);
@@ -268,7 +268,7 @@ export function DoctorQueueView({ doctorId }) {
       const { data, error: e } = await supabase
         .from("queue")
         .select(`
-          id, position, status, predicted_duration, notes,
+          id, status, predicted_duration, notes, created_at,
           appointments!inner(
             id, appointment_date, reason_for_visit, predicted_duration,
             patients:patient_id(full_name, age, gender)
@@ -278,7 +278,7 @@ export function DoctorQueueView({ doctorId }) {
         .gte("appointments.appointment_date", today + "T00:00:00")
         .lte("appointments.appointment_date", today + "T23:59:59")
         .in("status", ["waiting", "in-progress", "delayed"])
-        .order("position", { ascending: true });
+        .order("created_at", { ascending: true });
 
       if (e) throw e;
       setQueue(data ?? []);

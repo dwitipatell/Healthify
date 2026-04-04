@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabase";
 import LiveQueue from "./LiveQueue";
-import SettingsPage from "./SettingsPage";
+import DoctorSettingsPage from "./DoctorSettingsPage";
+import DoctorAvailabilityManager from "./DoctorAvailabilityManager";
+import DoctorQueueAnalytics from "./DoctorQueueAnalytics";
 
 const C = {
   // — Sidebar (dark indigo)
@@ -257,14 +259,10 @@ function DashboardContent({ user }) {
 }
 
 // ── Schedule Page ─────────────────────────────────────────────────────────────
-function SchedulePage() {
+function SchedulePage({ user, doctorId }) {
   return (
     <div style={{ padding: "28px 32px" }}>
-      <h2 style={{ fontFamily: FONT_SERIF, fontSize: 24, fontWeight: 700, color: C.text, margin: 0 }}>My Schedule</h2>
-      <p style={{ fontFamily: FONT_SANS, fontSize: 14, color: C.textMuted, margin: "4px 0 0" }}>Manage your availability and appointments</p>
-      <div style={{ marginTop: 20, padding: 20, background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, textAlign: "center" }}>
-        <p style={{ fontFamily: FONT_SANS, color: C.textMuted }}>Schedule view coming soon</p>
-      </div>
+      <DoctorAvailabilityManager user={user} doctorId={doctorId} />
     </div>
   );
 }
@@ -283,29 +281,25 @@ function PatientRecordsPage() {
 }
 
 // ── Analytics Page ────────────────────────────────────────────────────────────
-function AnalyticsPage() {
+function AnalyticsPage({ user, doctorId }) {
   return (
     <div style={{ padding: "28px 32px" }}>
-      <h2 style={{ fontFamily: FONT_SERIF, fontSize: 24, fontWeight: 700, color: C.text, margin: 0 }}>Analytics</h2>
-      <p style={{ fontFamily: FONT_SANS, fontSize: 14, color: C.textMuted, margin: "4px 0 0" }}>Your practice insights and metrics</p>
-      <div style={{ marginTop: 20, padding: 20, background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, textAlign: "center" }}>
-        <p style={{ fontFamily: FONT_SANS, color: C.textMuted }}>Analytics view coming soon</p>
-      </div>
+      <DoctorQueueAnalytics user={user} doctorId={doctorId} />
     </div>
   );
 }
 
 // ─── Page Router ─────────────────────────────────────────────────────────────
-function PageContent({ active, setActive, user }) {
+function PageContent({ active, setActive, user, doctorId }) {
   switch (active) {
     case "dashboard":    return <DashboardContent user={user} />;
-    case "schedule":     return <SchedulePage />;
-    case "queue":        return <LiveQueue />;
-    case "appointments": return <SchedulePage />;
+    case "schedule":     return <SchedulePage user={user} doctorId={doctorId} />;
+    case "queue":        return <LiveQueue role="doctor" doctorId={doctorId} />;
+    case "appointments": return <SchedulePage user={user} doctorId={doctorId} />;
     case "records":      return <PatientRecordsPage />;
     case "prescriptions": return <PatientRecordsPage />;
-    case "analytics":    return <AnalyticsPage />;
-    case "settings":     return <SettingsPage />;
+    case "analytics":    return <AnalyticsPage user={user} doctorId={doctorId} />;
+    case "settings":     return <DoctorSettingsPage />;
     default:             return <DashboardContent user={user} />;
   }
 }
@@ -315,6 +309,7 @@ export default function DoctorDashboard() {
   const navigate = useNavigate();
   const [active, setActive] = useState("dashboard");
   const [user, setUser] = useState(null);
+  const [doctorId, setDoctorId] = useState(null);
 
   useEffect(() => {
     const getUser = async () => {
@@ -336,6 +331,20 @@ export default function DoctorDashboard() {
       }
 
       setUser(user);
+      
+      // Fetch doctor ID from user ID
+      try {
+        const { data: doctors } = await supabase
+          .from('doctors')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+        if (doctors) {
+          setDoctorId(doctors.id);
+        }
+      } catch (err) {
+        console.error('Failed to fetch doctor ID:', err);
+      }
     };
     getUser();
   }, [navigate]);
@@ -357,7 +366,7 @@ export default function DoctorDashboard() {
       `}</style>
       <Sidebar active={active} setActive={setActive} user={user} onSignOut={handleSignOut} />
       <main style={{ flex: 1, overflowY: "auto", minWidth: 0, background: `linear-gradient(135deg, rgba(245, 244, 255, 0.6) 0%, rgba(238, 242, 255, 0.4) 100%)` }}>
-        <PageContent active={active} setActive={setActive} user={user} />
+        <PageContent active={active} setActive={setActive} user={user} doctorId={doctorId} />
       </main>
     </div>
   );
