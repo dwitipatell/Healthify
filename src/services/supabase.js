@@ -2,6 +2,8 @@
 // ─── Healthify · Complete Supabase Service Layer ─────────────────────────────
 
 import { createClient } from '@supabase/supabase-js';
+import { sendAppointmentConfirmationSMS } from './smsReminder';
+import { NOTIFICATION_TYPES } from '../constants/notificationKeys';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -31,8 +33,20 @@ export const getDoctors = async () => {
     .select('*, doctor_availability(*)')
     .eq('is_active', true)
     .order('full_name');
-  if (error) throw error;
-  return data;
+  
+  if (error) {
+    console.error('Error fetching doctors:', error);
+    // Fallback: try fetching without the is_active filter
+    const { data: allDoctors, error: fallbackError } = await supabase
+      .from('doctors')
+      .select('*, doctor_availability(*)')
+      .order('full_name');
+    
+    if (fallbackError) throw fallbackError;
+    return allDoctors || [];
+  }
+  
+  return data || [];
 };
 
 export const getDoctorByUserId = async (userId) => {
@@ -40,8 +54,12 @@ export const getDoctorByUserId = async (userId) => {
     .from('doctors')
     .select('*, doctor_availability(*)')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data) {
+    console.warn('No doctor profile found for user:', userId);
+    return null;
+  }
   return data;
 };
 
@@ -128,6 +146,7 @@ export const bookAppointment = async ({
   patientId, doctorId, patientName, patientAge, patientGender,
   reason, scheduledAt, durationMin = 20,
   noshowRisk = null, noshowProbability = null,
+  patientPhone = null, doctorName = null, clinic = null,
 }) => {
   const { data, error } = await supabase
     .from('appointments')
@@ -161,14 +180,59 @@ export const bookAppointment = async ({
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
-      if (created) return created;
+      if (created) {
+        // Create queue entry and send notifications
+        await addToQueue(created.id, doctorId);
+        await triggerAppointmentConfirmationNotifications(created, patientPhone, doctorName);
+        return created;
+      }
     }
     throw error;
   }
+
+  // Create queue entry for the appointment
+  try {
+    await addToQueue(data.id, doctorId);
+  } catch (qErr) {
+    console.error('Error adding appointment to queue:', qErr);
+    // Don't throw - appointment already created successfully
+  }
+
+  // Send SMS confirmation and create notification
+  await triggerAppointmentConfirmationNotifications(data, patientPhone, doctorName);
+
   return data;
 };
 
-export const rescheduleAppointment = async (appointmentId, newScheduledAt) => {
+/**
+ * Trigger SMS and in-app notifications when appointment is confirmed
+ */
+const triggerAppointmentConfirmationNotifications = async (appointment, patientPhone, doctorName) => {
+  try {
+    // Send SMS if phone available
+    if (patientPhone) {
+      await sendAppointmentConfirmationSMS(
+        patientPhone,
+        appointment,
+        doctorName || 'Dr. Your Doctor'
+      );
+    }
+
+    // Create in-app notification
+    await createNotification(
+      appointment.patient_id,
+      'Appointment Confirmed ✅',
+      `Your appointment with ${doctorName || 'your doctor'} has been confirmed for ${new Date(appointment.scheduled_at).toLocaleDateString('en-IN')}.`,
+      NOTIFICATION_TYPES.APPOINTMENT_CONFIRMED,
+      appointment.id
+    );
+  } catch (err) {
+    console.error('Error sending appointment confirmation notifications:', err);
+    // Don't throw - appointment already created successfully
+  }
+};
+
+export const rescheduleAppointment = async (appointmentId, newScheduledAt, patientPhone = null, doctorName = null) => {
   const { data, error } = await supabase
     .from('appointments')
     .update({ scheduled_at: newScheduledAt, status: 'confirmed' })
@@ -176,10 +240,33 @@ export const rescheduleAppointment = async (appointmentId, newScheduledAt) => {
     .select()
     .single();
   if (error) throw error;
+
+  // Send reschedule notification
+  if (patientPhone) {
+    const { sendAppointmentRescheduleNotificationSMS } = await import('./smsReminder');
+    await sendAppointmentRescheduleNotificationSMS(patientPhone, data, doctorName);
+  }
+  
+  // Create in-app notification
+  await createNotification(
+    data.patient_id,
+    'Appointment Rescheduled 📅',
+    `Your appointment has been moved to ${new Date(newScheduledAt).toLocaleDateString('en-IN')} at ${new Date(newScheduledAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}.`,
+    NOTIFICATION_TYPES.APPOINTMENT_RESCHEDULED,
+    appointmentId
+  );
+
   return data;
 };
 
-export const cancelAppointment = async (appointmentId) => {
+export const cancelAppointment = async (appointmentId, patientPhone = null, doctorName = null) => {
+  // Get appointment details before cancelling
+  const { data: appointmentData } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('id', appointmentId)
+    .single();
+
   const { data, error } = await supabase
     .from('appointments')
     .update({ status: 'cancelled' })
@@ -187,7 +274,24 @@ export const cancelAppointment = async (appointmentId) => {
     .select()
     .single();
   if (error) throw error;
+  
   await supabase.from('queue').delete().eq('appointment_id', appointmentId);
+
+  // Send cancellation notification
+  if (patientPhone && appointmentData) {
+    const { sendAppointmentCancellationSMS } = await import('./smsReminder');
+    await sendAppointmentCancellationSMS(patientPhone, appointmentData, doctorName);
+  }
+
+  // Create in-app notification
+  await createNotification(
+    data.patient_id,
+    'Appointment Cancelled ❌',
+    `Your appointment has been cancelled. Contact us to reschedule.`,
+    NOTIFICATION_TYPES.APPOINTMENT_CANCELLED,
+    appointmentId
+  );
+
   return data;
 };
 
@@ -358,20 +462,29 @@ export const getPatientQueuePosition = async (appointmentId) => {
 
 /** Add an appointment to today's queue */
 export const addToQueue = async (appointmentId, doctorId) => {
-  const today = new Date().toISOString().split('T')[0];
-
   const { data, error } = await supabase
     .from('queue')
     .insert({
       appointment_id: appointmentId,
       doctor_id: doctorId,
-      queue_date: today,
       status: 'waiting',
+      predicted_duration: 20, // Default 20 min
     })
     .select()
     .single();
-  if (error) throw error;
-  await recomputeQueueWaitTimes(doctorId);
+  
+  if (error) {
+    console.error('Error adding to queue:', error);
+    // Don't throw - let the appointment succeed even if queue fails
+    return null;
+  }
+  
+  try {
+    await recomputeQueueWaitTimes(doctorId);
+  } catch (err) {
+    console.error('Error recomputing queue wait times:', err);
+  }
+  
   return data;
 };
 
@@ -406,26 +519,72 @@ export const checkInPatient = async (queueId) => {
   return data;
 };
 
+/** Get daily queue statistics for a doctor */
+export const getDailyQueueStats = async (doctorId) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  // Get total appointments for today
+  const { data: appointments, error: apptError } = await supabase
+    .from('appointments')
+    .select('id, status')
+    .eq('doctor_id', doctorId)
+    .gte('scheduled_at', today.toISOString())
+    .lt('scheduled_at', tomorrow.toISOString());
+  
+  if (apptError) throw apptError;
+
+  // Get current queue count
+  const { count: queueCount, error: queueError } = await supabase
+    .from('queue')
+    .select('id', { count: 'exact', head: true })
+    .eq('doctor_id', doctorId)
+    .in('status', ['waiting', 'in-progress', 'delayed']);
+
+  if (queueError) throw queueError;
+
+  // Calculate stats
+  const totalAppointments = appointments?.length || 0;
+  const completedAppointments = appointments?.filter(a => a.status === 'completed').length || 0;
+  const cancelledAppointments = appointments?.filter(a => a.status === 'cancelled').length || 0;
+  const noShowAppointments = appointments?.filter(a => a.status === 'no_show').length || 0;
+  const currentQueueCount = queueCount || 0;
+
+  return {
+    totalAppointments,
+    completedAppointments,
+    cancelledAppointments,
+    noShowAppointments,
+    currentQueueCount,
+    upcomingAppointments: totalAppointments - completedAppointments - cancelledAppointments - noShowAppointments,
+  };
+};
+
 /** Recompute estimated wait times for all patients in today's queue */
 export const recomputeQueueWaitTimes = async (doctorId) => {
-  const today = new Date().toISOString().split('T')[0];
-  const { data: queueRows } = await supabase
-    .from('queue')
-    .select('id, created_at, predicted_duration')
-    .eq('doctor_id', doctorId)
-    .eq('queue_date', today)
-    .in('status', ['waiting', 'in-progress', 'delayed'])
-    .order('created_at', { ascending: true });
-
-  if (!queueRows?.length) return;
-
-  let cumulativeWait = 0;
-  for (const row of queueRows) {
-    await supabase
+  try {
+    const { data: queueRows } = await supabase
       .from('queue')
-      .update({ estimated_wait: cumulativeWait })
-      .eq('id', row.id);
-    cumulativeWait += row.predicted_duration ?? 20;
+      .select('id, created_at, predicted_duration')
+      .eq('doctor_id', doctorId)
+      .in('status', ['waiting', 'in-progress'])
+      .order('created_at', { ascending: true });
+
+    if (!queueRows?.length) return;
+
+    let cumulativeWait = 0;
+    for (const row of queueRows) {
+      await supabase
+        .from('queue')
+        .update({ cumulative_wait_time: cumulativeWait })
+        .eq('id', row.id);
+      cumulativeWait += row.predicted_duration ?? 20;
+    }
+  } catch (err) {
+    console.error('Error recomputing queue wait times:', err);
+    // Don't throw - let the calling function continue
   }
 };
 
@@ -756,6 +915,136 @@ export const getOptimalBookingSlots = async (doctorId, date, count = 5) => {
     .map(s => s.slot);
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  INTELLIGENT APPOINTMENT SYSTEM - ADDITIONAL FUNCTIONS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Update appointment with predicted values (duration & no-show risk)
+ */
+export const updateAppointmentPredictions = async (appointmentId, predictedDurationMin, noshowRisk, noshowProbability) => {
+  const { data, error } = await supabase
+    .from('appointments')
+    .update({
+      predicted_duration: predictedDurationMin,
+      noshow_risk: noshowRisk,
+      noshow_probability: noshowProbability,
+    })
+    .eq('id', appointmentId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Get all high-risk appointments for a doctor today
+ */
+export const getDoctorHighRiskAppointments = async (doctorId) => {
+  const today = new Date().toISOString().split('T')[0];
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('doctor_id', doctorId)
+    .eq('noshow_risk', true)
+    .gte('scheduled_at', today + 'T00:00:00')
+    .lte('scheduled_at', today + 'T23:59:59')
+    .in('status', ['confirmed']);
+
+  if (error) throw error;
+  return data || [];
+};
+
+/**
+ * Get queue health metrics for all doctors
+ */
+export const getSystemQueueHealthMetrics = async () => {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { data, error } = await supabase
+    .from('queue')
+    .select(`
+      doctor_id,
+      status,
+      predicted_duration,
+      appointments!inner(scheduled_at)
+    `)
+    .gte('appointments.scheduled_at', today + 'T00:00:00')
+    .lte('appointments.scheduled_at', today + 'T23:59:59');
+
+  if (error) throw error;
+
+  // Group by doctor and calculate metrics
+  const metrics = {};
+  if (data && data.length > 0) {
+    data.forEach(entry => {
+      if (!metrics[entry.doctor_id]) {
+        metrics[entry.doctor_id] = { waiting: 0, inProgress: 0, totalWaitMin: 0 };
+      }
+      if (entry.status === 'waiting') metrics[entry.doctor_id].waiting++;
+      if (entry.status === 'in-progress') metrics[entry.doctor_id].inProgress++;
+      metrics[entry.doctor_id].totalWaitMin += entry.predicted_duration || 15;
+    });
+  }
+
+  return metrics;
+};
+
+/**
+ * Log appointment delay for analytics
+ */
+export const logAppointmentDelay = async (appointmentId, delayMinutes) => {
+  const { data, error } = await supabase
+    .from('appointments')
+    .update({ delay_min: delayMinutes })
+    .eq('id', appointmentId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Get alternative doctor recommendations for patient
+ */
+export const getAlternativeDoctorRecommendations = async (doctorId, specialty, limit = 3) => {
+  const { data, error } = await supabase
+    .from('doctors')
+    .select('id, full_name, specialty, clinic, is_active')
+    .eq('specialty', specialty)
+    .eq('is_active', true)
+    .neq('id', doctorId)
+    .limit(limit);
+
+  if (error) throw error;
+  return data || [];
+};
+
+/**
+ * Record consultation analytics for ML training
+ */
+export const recordConsultationMetrics = async (appointmentId, doctorId, actualDurationMin, specialty, reason, patientAge) => {
+  // This should already be handled by completeConsultation, but here for explicitness
+  const { data, error } = await supabase
+    .from('consult_history')
+    .insert({
+      appointment_id: appointmentId,
+      doctor_id: doctorId,
+      actual_min: actualDurationMin,
+      specialty,
+      reason,
+      patient_age: patientAge,
+      created_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
 /** Reschedule appointment with load balancing */
 export const smartRescheduleAppointment = async (appointmentId, doctorId, preferredDate) => {
   const { data: appt } = await supabase
@@ -835,4 +1124,80 @@ export const notifyQueueDelay = async (doctorId, delayMinutes) => {
   });
 
   await Promise.all(promises);
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  DEBUG/TEST FUNCTIONS - For development only
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Test function: Create a test appointment and queue entry */
+export const testCreateAppointment = async (patientName = "Test Patient", doctorId, patientAge = 30) => {
+  try {
+    console.log('🧪 Creating test appointment for doctorId:', doctorId);
+    
+    // Create appointment
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0);
+
+    const { data: appt, error: apptErr } = await supabase
+      .from('appointments')
+      .insert({
+        patient_id: '00000000-0000-0000-0000-000000000001', // fake ID
+        doctor_id: doctorId,
+        patient_name: patientName,
+        patient_age: patientAge,
+        patient_gender: 'M',
+        reason: 'TEST: General Checkup',
+        scheduled_at: tomorrow.toISOString(),
+        duration_min: 20,
+        status: 'confirmed',
+      })
+      .select()
+      .single();
+
+    if (apptErr) {
+      console.error('❌ Failed to create appointment:', apptErr);
+      return;
+    }
+
+    console.log('✅ Appointment created:', appt);
+
+    // Create queue entry
+    const queueResult = await addToQueue(appt.id, doctorId);
+    console.log('✅ Queue entry created:', queueResult);
+
+    return appt;
+  } catch (err) {
+    console.error('❌ Test failed:', err);
+  }
+};
+
+/** Debug function: List all queue entries */
+export const debugListQueue = async (doctorId) => {
+  try {
+    const { data } = await supabase
+      .from('queue')
+      .select('*')
+      .eq('doctor_id', doctorId);
+    console.log('📋 Queue entries for doctor', doctorId, ':', data);
+    return data;
+  } catch (err) {
+    console.error('❌ Debug failed:', err);
+  }
+};
+
+/** Debug function: List all appointments */
+export const debugListAppointments = async (doctorId) => {
+  try {
+    const { data } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('doctor_id', doctorId)
+      .limit(10);
+    console.log('📅 Appointments for doctor', doctorId, ':', data);
+    return data;
+  } catch (err) {
+    console.error('❌ Debug failed:', err);
+  }
 };

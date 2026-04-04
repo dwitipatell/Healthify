@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { SettingsProvider } from "./context/SettingsContext";
 
 import LandingPage from "./pages/landingpage";
@@ -8,7 +9,30 @@ import DoctorLogin from "./pages/DoctorLogin";
 import DoctorDashboard from "./pages/doctordashboard";
 import PatientDashboard from "./pages/patientdashboard";
 
+// Initialize intelligent appointment prediction models
+import { initializeConsultationModel } from "./services/appointmentPrediction";
+import { initializeNoshowModel } from "./services/noshowPrediction";
+
 export default function App() {
+  // Initialize ML models on app startup
+  useEffect(() => {
+    const initModels = async () => {
+      try {
+        console.log('🚀 Initializing Intelligent Appointment System...');
+        await Promise.all([
+          initializeConsultationModel(),
+          initializeNoshowModel(),
+        ]);
+        console.log('✓ Prediction models ready');
+      } catch (err) {
+        console.error('Error initializing prediction models:', err);
+        // Continue anyway - models have fallbacks
+      }
+    };
+
+    initModels();
+  }, []);
+
   return (
     <SettingsProvider>
       <BrowserRouter>

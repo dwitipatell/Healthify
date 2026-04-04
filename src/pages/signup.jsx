@@ -16,6 +16,7 @@ export default function SignupPage() {
 
   const [role, setRole] = useState("patient");
   const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [license, setLicense] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,6 +40,7 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: fullName,
+            phone: phone || null,
             role,
             ...(isDoctor && license ? { license } : {}),
           },
@@ -187,6 +189,14 @@ export default function SignupPage() {
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
+          />
+
+          <input
+            type="tel"
+            placeholder="Phone (e.g., +91 9876543210)"
+            className="auth-input"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
           />
 
           {isDoctor && (
