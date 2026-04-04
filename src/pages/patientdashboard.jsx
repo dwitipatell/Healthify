@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import { useSettings } from '../context/SettingsContext';
+import { Logo } from '../components/Logo';
 import Noshowanalytics from './Noshowanalytics';
 import BookAppointment from './BookAppointment';
 import SettingsPage from './SettingsPage';
@@ -150,23 +152,24 @@ function GearIcon({ size = 16, color = "currentColor" }) {
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-function Sidebar({ active, setActive, user, onSignOut }) {
+function Sidebar({ active, setActive, user, onSignOut, colors = C }) {
+  const C = colors;
   return (
     <aside style={{ width: 240, minWidth: 240, background: C.sidebarBg, display: "flex", flexDirection: "column", borderRight: `1px solid ${C.sidebarBorder}`, height: "100vh", position: "sticky", top: 0 }}>
       {/* Logo */}
       <div style={{ padding: "24px 20px 20px", borderBottom: `1px solid ${C.sidebarBorder}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.primary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: C.primary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="3" width="18" height="18" rx="4" fill="white" opacity=".2" />
               <path d="M12 8v8M8 12h8" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           </div>
-          <div>
-            <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 17, color: C.white, margin: 0, letterSpacing: "-0.3px" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: FONT_SANS, fontWeight: 700, fontSize: 17, color: C.white, margin: 0, letterSpacing: "-0.3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               Health<span style={{ color: C.primaryLight }}>ify</span>
             </p>
-            <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.sidebarText, margin: 0 }}>Patient Portal</p>
+            <p style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.sidebarText, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Patient Portal</p>
           </div>
         </div>
       </div>
@@ -223,7 +226,8 @@ function Sidebar({ active, setActive, user, onSignOut }) {
 }
 
 // ─── Top Bar ──────────────────────────────────────────────────────────────────
-function TopBar({ onBook, user }) {
+function TopBar({ onBook, user, colors = C }) {
+  const C = colors;
   const now = new Date();
   const hour = now.getHours();
   const greet = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
@@ -249,7 +253,8 @@ function TopBar({ onBook, user }) {
 }
 
 // ─── Stat Cards ───────────────────────────────────────────────────────────────
-function StatCards() {
+function StatCards({ colors = C }) {
+  const C = colors;
   const stats = [
     {
       label: "Upcoming", value: "2", sub: "This week", subColor: C.primary, subBg: C.primaryXLight, iconBg: C.primary,
@@ -280,7 +285,8 @@ function StatCards() {
 }
 
 // ─── Next Appointment Hero ────────────────────────────────────────────────────
-function NextAppointment() {
+function NextAppointment({ colors = C }) {
+  const C = colors;
   return (
     <div style={{ margin: "20px 32px 0", borderRadius: 20, padding: "26px 32px", background: "linear-gradient(130deg, #0D2926 0%, #0F766E 50%, #0D9488 100%)", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: -50, right: -50, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
@@ -314,7 +320,8 @@ function NextAppointment() {
 }
 
 // ─── Upcoming Appointments ────────────────────────────────────────────────────
-function UpcomingAppointments({ setActive }) {
+function UpcomingAppointments({ setActive, colors = C }) {
+  const C = colors;
   const [appointments, setAppointments] = React.useState([]);
   const [starred, setStarred] = React.useState(new Set());
   const [loading, setLoading] = React.useState(true);
@@ -425,7 +432,8 @@ function UpcomingAppointments({ setActive }) {
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
-function Notifications() {
+function Notifications({ colors = C }) {
+  const C = colors;
   return (
     <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, overflow: "hidden" }}>
       <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${C.borderMuted}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -446,7 +454,8 @@ function Notifications() {
 }
 
 // ─── Recent Visits ────────────────────────────────────────────────────────────
-function RecentVisits() {
+function RecentVisits({ colors = C }) {
+  const C = colors;
   return (
     <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, overflow: "hidden" }}>
       <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${C.borderMuted}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -468,18 +477,19 @@ function RecentVisits() {
 }
 
 // ─── Dashboard Content ────────────────────────────────────────────────────────
-function DashboardContent({ setActive, user }) {
+function DashboardContent({ setActive, user, colors = C }) {
+  const C = colors;
   return (
     <div style={{ paddingBottom: 40 }}>
-      <TopBar onBook={() => setActive("book")} user={user} />
-      <StatCards />
-      <NextAppointment />
+      <TopBar onBook={() => setActive("book")} user={user} colors={colors} />
+      <StatCards colors={colors} />
+      <NextAppointment colors={colors} />
       <div style={{ padding: "20px 32px 0", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <UpcomingAppointments setActive={setActive} />
-        <Notifications />
+        <UpcomingAppointments setActive={setActive} colors={colors} />
+        <Notifications colors={colors} />
       </div>
       <div style={{ padding: "16px 32px 0" }}>
-        <RecentVisits />
+        <RecentVisits colors={colors} />
       </div>
     </div>
   );
@@ -597,9 +607,10 @@ function AppointmentsFullPage({ user }) {
 }
 
 // ─── Page Router ──────────────────────────────────────────────────────────────
-function PageContent({ active, setActive, user }) {
+function PageContent({ active, setActive, user, colors = C, settings = {} }) {
+  const C = colors;
   switch (active) {
-    case "dashboard": return <DashboardContent setActive={setActive} user={user} />;
+    case "dashboard": return <DashboardContent setActive={setActive} user={user} colors={colors} />;
     case "book": return <BookAppointment onNavigateToAppointments={() => setActive('appointments')} />;
     case "appointments": return <AppointmentsFullPage user={user} />;
     case "records": return <HealthRecordsPage />;
@@ -607,15 +618,29 @@ function PageContent({ active, setActive, user }) {
     case "notifications": return <NotificationsFullPage />;
     case "noshow": return <Noshowanalytics />;
     case "settings": return <SettingsPage />;
-    default: return <DashboardContent setActive={setActive} user={user} />;
+    default: return <DashboardContent setActive={setActive} user={user} colors={colors} />;
   }
 }
 
 // ─── Root Component ───────────────────────────────────────────────────────────
 export default function PatientDashboard() {
   const navigate = useNavigate();
+  const { settings } = useSettings();
   const [active, setActive] = useState("dashboard");
   const [user, setUser] = useState(null);
+
+  // Dynamic colors based on settings
+  const accentColor = settings.accentColor || "#0D9488";
+  const primaryLight = accentColor + "33"; // Add transparency
+  const primaryGlow = accentColor + "26";  // Add transparency
+  
+  // Create dynamic color object that overrides hardcoded colors
+  const dynamicC = {
+    ...C,
+    primary: accentColor,
+    primaryLight: primaryLight,
+    primaryGlow: primaryGlow,
+  };
 
   useEffect(() => {
     const getUser = async () => {
@@ -655,10 +680,17 @@ export default function PatientDashboard() {
         button:hover { opacity: 0.88; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 4px; }
+        
+        :root {
+          --accent-primary: ${settings.accentColor};
+          --font-body: '${settings.bodyFont}', sans-serif;
+          --font-size-base: ${settings.fontSize}px;
+          --radius-base: ${settings.radius}px;
+        }
       `}</style>
-      <Sidebar active={active} setActive={setActive} user={user} onSignOut={handleSignOut} />
-      <main style={{ flex: 1, overflowY: "auto", minWidth: 0 }}>
-        <PageContent active={active} setActive={setActive} user={user} />
+      <Sidebar active={active} setActive={setActive} user={user} onSignOut={handleSignOut} colors={dynamicC} />
+      <main style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: "auto", minWidth: 0, fontFamily: `'${settings.bodyFont}', sans-serif`, fontSize: `${settings.fontSize}px` }}>
+        <PageContent active={active} setActive={setActive} user={user} colors={dynamicC} settings={settings} />
       </main>
     </div>
   );

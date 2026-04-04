@@ -130,9 +130,9 @@ export default function SignupPage() {
         {/* Brand */}
         <div className="auth-card__header">
           <div className="auth-card__logo-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2a10 10 0 100 20A10 10 0 0012 2z" fill="white" opacity=".2" />
-              <path d="M8 12h8M12 8v8" stroke="white" strokeWidth="2" strokeLinecap="round" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="18" height="18" rx="4" fill="white" opacity=".2" />
+              <path d="M12 8v8M8 12h8" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           </div>
           <span className="auth-card__logo-text">Healthify</span>
