@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';  
 import '../styles/login.css';
-import "../components/Global.css";
 
-const Login = ({ onBack }) => {
+const Login = () => {
+  const navigate = useNavigate();
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [role, setRole] = useState('patient');
   const [email, setEmail] = useState('');
@@ -14,12 +15,24 @@ const Login = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const handleBackToHome = () => navigate("/");
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     if (isSignUp) {
+      // Check if email already exists with a different role
+      const { data: existingUsers } = await supabase.auth.admin.listUsers() || { data: [] };
+      const existingUser = existingUsers?.find(u => u.email === email);
+      
+      if (existingUser?.user_metadata?.role && existingUser.user_metadata.role !== role) {
+        setError(`This email is already registered as a ${existingUser.user_metadata.role}. Please login with that role instead.`);
+        setLoading(false);
+        return;
+      }
+
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -33,13 +46,25 @@ const Login = ({ onBack }) => {
       localStorage.setItem('userRole', role);
       window.location.href = role === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard';
     } else {
+      // Login: Check if role matches
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
         setError(signInError.message);
         setLoading(false);
         return;
       }
-      const savedRole = data.user?.user_metadata?.role || role;
+
+      // Verify that the user's registered role matches the role they're trying to login with
+      const registeredRole = data.user?.user_metadata?.role;
+      if (registeredRole && registeredRole !== role) {
+        // Sign them out immediately
+        await supabase.auth.signOut();
+        setError(`This email is registered as a ${registeredRole}. Please select "${registeredRole}" to login.`);
+        setLoading(false);
+        return;
+      }
+
+      const savedRole = registeredRole || role;
       localStorage.setItem('userRole', savedRole);
       window.location.href = savedRole === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard';
     }
@@ -48,12 +73,56 @@ const Login = ({ onBack }) => {
 
   return (
     <div className="auth-page">
-      {/* Light subtle dashboard preview background */}
-      <div className="auth-page-bg-preview"></div>
+      {/* Blurred Dashboard Background */}
+      <div className="auth-bg">
+        <div className="auth-bg-dashboard" />
+      </div>
+
+      <style>{`
+        .auth-card {
+          background: rgba(255, 255, 255, 0.88);
+          border: 1.5px solid rgba(255, 255, 255, 0.6);
+        }
+
+        .role-toggle__btn--active-doctor {
+          background: #6366F1 !important;
+          color: white !important;
+          border-color: #6366F1 !important;
+        }
+
+        .auth-submit-doctor {
+          background: #6366F1 !important;
+          box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35) !important;
+        }
+
+        .auth-submit-doctor:hover {
+          background: #4F46E5 !important;
+        }
+
+        ${role === 'doctor' ? `
+          .auth-card__logo-text { color: #1E1B4B; }
+          .auth-card__title { color: #1E1B4B; }
+          .auth-card__subtitle { color: #6B7FBD; }
+          .auth-input { border-color: rgba(99, 102, 241, 0.2); }
+          .auth-input:focus { border-color: rgba(99, 102, 241, 0.5); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+          .auth-footer-link { color: #6366F1; }
+          .auth-error { background: #FEE2E2; color: #991B1B; }
+        ` : `
+          .auth-card__logo-text { color: #134E4A; }
+          .auth-card__title { color: #134E4A; }
+          .auth-card__subtitle { color: #4B7B76; }
+          .auth-input { border-color: rgba(13, 148, 136, 0.2); }
+          .auth-input:focus { border-color: rgba(13, 148, 136, 0.5); box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); }
+          .auth-footer-link { color: #0D9488; }
+        `}
+      `}</style>
 
       <div className="auth-card">
-        {/* Back Button - Fixed & Prominent */}
-        <button className="login-back-btn" onClick={onBack || (() => window.location.href = '/')}>
+        {/* Back Button */}
+        <button 
+          className="login-back-btn" 
+          onClick={handleBackToHome}
+        >
           ← Back to Home
         </button>
 
